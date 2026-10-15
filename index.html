@@ -5,21 +5,22 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="DesignHub is preparing a new destination for embroidery designs and creative makers.">
     <meta name="theme-color" content="#f7f3ec">
-    <title>DesignHub — Coming Soon</title>
+    <title>DesignHub &mdash; Coming Soon</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Playfair+Display:ital,wght@0,600;1,500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="header-footer.css">
 </head>
 <body>
     <main class="page-shell">
         <nav class="nav" aria-label="Primary navigation">
             <a class="brand" href="#" aria-label="DesignHub home">
                 <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 44 44"><path d="M22 4 38 13v18L22 40 6 31V13L22 4Z"/><path d="m14 26 8-13 8 13-8 5-8-5Z"/></svg></span>
-                <span>DesignHub</span>
+                <span class="brand-name">DesignHub<small>Made for makers</small></span>
             </a>
-            <p class="edition">Digital embroidery marketplace</p>
-            <span class="status"><i></i> In the making</span>
+            <p class="edition"><span>01</span> Digital embroidery marketplace</p>
+            <span class="status"><i></i> Launching soon</span>
         </nav>
 
         <section class="hero">
@@ -36,7 +37,7 @@
                     <g class="petals-b" transform="rotate(45 150 150)"><ellipse cx="150" cy="96" rx="18" ry="44"/><ellipse cx="150" cy="204" rx="18" ry="44"/><ellipse cx="96" cy="150" rx="44" ry="18"/><ellipse cx="204" cy="150" rx="44" ry="18"/></g>
                     <circle cx="150" cy="150" r="28"/>
                 </svg></div></div>
-                <span class="spark spark-one">✦</span><span class="spark spark-two">✦</span>
+                <span class="spark spark-one">&#10022;</span><span class="spark spark-two">&#10022;</span>
             </div>
 
             <div class="launch-row"><span></span><p>Something beautiful is taking shape</p><span></span></div>
@@ -48,7 +49,20 @@
             <article><span>03</span><div><h2>Connect</h2><p>A growing space for designers and creative makers.</p></div></article>
         </section>
 
-        <footer><p>Made with care for the embroidery community.</p><p>© <span id="year"></span> DesignHub</p></footer>
+        <footer class="site-footer">
+            <div class="footer-top">
+                <a class="footer-brand" href="#" aria-label="Back to top">
+                    <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 44 44"><path d="M22 4 38 13v18L22 40 6 31V13L22 4Z"/><path d="m14 26 8-13 8 13-8 5-8-5Z"/></svg></span>
+                    <span>DesignHub</span>
+                </a>
+                <p class="footer-statement">Built for the people who turn thread into <em>something worth keeping.</em></p>
+            </div>
+            <div class="footer-bottom">
+                <p>Digital embroidery marketplace</p>
+                <p><span class="footer-dot"></span> Currently in development</p>
+                <p>&copy; <span id="year"></span> DesignHub</p>
+            </div>
+        </footer>
     </main>
     <script src="script.js"></script>
 </body>
