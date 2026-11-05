@@ -1,3 +1,8 @@
+import chikankariImage from '../assets/images/chikankari_floral_1793879818315.jpg';
+import heroImage from '../assets/images/hero_textile_embroidery_1793879816875.jpg';
+import navySequinImage from '../assets/images/navy_sequin_jaal_1793879819407.jpg';
+import sareeBorderImage from '../assets/images/saree_border_zari_1793879818864.jpg';
+
 export interface DesignItem {
   id: string;
   title: string;
@@ -127,12 +132,12 @@ export interface LedgerItem {
   rawCode: string;
 }
 
-// Visual asset paths generated
+// Importing the files lets Vite fingerprint and publish them with the production build.
 export const ASSET_IMAGES = {
-  hero: '/src/assets/images/hero_textile_embroidery_1793879816875.jpg',
-  sareeBorder: '/src/assets/images/saree_border_zari_1793879818864.jpg',
-  chikankari: '/src/assets/images/chikankari_floral_1793879818315.jpg',
-  navySequin: '/src/assets/images/navy_sequin_jaal_1793879819407.jpg',
+  hero: heroImage,
+  sareeBorder: sareeBorderImage,
+  chikankari: chikankariImage,
+  navySequin: navySequinImage,
 };
 
 export const CREATORS: CreatorItem[] = [
