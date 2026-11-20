@@ -96,10 +96,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     phone: '9825012345',
     countryCode: '+91',
     avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
-    role: 'seller', // Can toggle between seller and buyer for rich previewing
+    role: 'seller', // Temporary preview role used after the simulated sign-in flow.
     machinePreferences: ['Multi-head Embroidery', 'Schiffli', 'Ari / Sequence Multi'],
     settlementMode: 'manual',
-    isLoggedIn: true,
+    isLoggedIn: false,
     bankAccount: 'HDFC Bank ending in 4082',
     companyName: 'Surat Embroidery Digitizing LLP',
     gstNumber: '24AAECS1234E1Z7',

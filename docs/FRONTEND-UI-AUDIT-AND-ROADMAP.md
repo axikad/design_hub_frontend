@@ -368,6 +368,17 @@ Exit condition: every screen is visually approved and every displayed field has 
 
 Exit condition: guest can browse real server data without login.
 
+Implementation status (20 November 2026): complete and runtime-verified.
+
+- Added an environment-based typed API client with normalized Laravel errors and pagination metadata.
+- Connected live `/home`, `/catalog/browse-filters`, `/designs`, `/designs/{id}`, `/folders` and `/folders/{id}` endpoints.
+- Home, Explore, Design detail, Folder listing and paginated Folder detail no longer read marketplace records from fixtures.
+- Explore sends search, machine type, category, design type, stitch, needle and area filters to the server before pagination.
+- Design detail renders real per-design-type specifications and the optional image-card layout returned by the backend.
+- Public routes work without an access token; live CORS was verified for `https://designshub.org`.
+- Headless-browser smoke tests confirmed live content renders on all five public page flows.
+- Account, saved designs, checkout, downloads and seller studio remain explicitly preview-only for later phases.
+
 ### Phase 3 — Authentication and buyer account
 
 - Integrate OTP/register/logout.

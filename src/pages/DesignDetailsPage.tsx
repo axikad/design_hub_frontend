@@ -1,428 +1,162 @@
-import React, { useState } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
-import {
-  Heart,
-  Share2,
-  Download,
-  CheckCircle2,
-  FileCheck,
-  Maximize2,
-  X,
-  Layers,
-  Cpu,
-  Scissors,
-  Sparkles,
-  ArrowRight,
-  ExternalLink,
-  Edit3
-} from 'lucide-react';
-import { useApp } from '../context/AppContext';
+import React, { useEffect, useMemo, useState } from 'react';
+import { AlertCircle, CheckCircle2, FileCheck, Maximize2, Share2, X } from 'lucide-react';
+import { Link, useParams } from 'react-router-dom';
 import { DesignCard } from '../components/common/DesignCard';
+import { getErrorMessage, marketplaceApi } from '../lib/api-client';
+import { normalizeAssetUrl, toDesignCard } from '../lib/marketplace-mappers';
+import type { ApiDesign, BrowseFilters } from '../types/marketplace';
+
+const inr = (paise: number) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(paise / 100);
+const numeric = (value: string | number | null | undefined) => Number(value ?? 0) || 0;
 
 export const DesignDetailsPage: React.FC = () => {
-  const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
-  const { designs, user, isSaved, toggleSaveDesign, isPurchased, showToast } = useApp();
-
-  const design = designs.find((d) => d.id === id) || designs[0];
-  const [activeImageIndex, setActiveImageIndex] = useState(0);
+  const { id = '' } = useParams<{ id: string }>();
+  const [design, setDesign] = useState<ApiDesign | null>(null);
+  const [filters, setFilters] = useState<BrowseFilters | null>(null);
+  const [related, setRelated] = useState<ApiDesign[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [reloadKey, setReloadKey] = useState(0);
+  const [activeImage, setActiveImage] = useState(0);
   const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [shareMessage, setShareMessage] = useState('');
 
-  const saved = isSaved(design.id);
-  const purchased = isPurchased(design.id);
-  const isOwner = user.id === design.sellerId;
+  useEffect(() => {
+    const controller = new AbortController();
+    setLoading(true);
+    setError('');
+    setActiveImage(0);
+    (async () => {
+      try {
+        const [designResponse, filterResponse] = await Promise.all([
+          marketplaceApi.design(id, controller.signal),
+          marketplaceApi.browseFilters(controller.signal),
+        ]);
+        if (controller.signal.aborted) return;
+        setDesign(designResponse.data);
+        setFilters(filterResponse.data);
+        if (designResponse.data.categoryId) {
+          const relatedResponse = await marketplaceApi.designs({ category_ids: [designResponse.data.categoryId], page: 1, per_page: 4 }, controller.signal);
+          setRelated(relatedResponse.data.filter((item) => item.id !== id).slice(0, 3));
+        } else {
+          setRelated([]);
+        }
+      } catch (requestError) {
+        if (requestError instanceof DOMException && requestError.name === 'AbortError') return;
+        setError(getErrorMessage(requestError));
+        setDesign(null);
+      } finally {
+        if (!controller.signal.aborted) setLoading(false);
+      }
+    })();
+    return () => controller.abort();
+  }, [id, reloadKey]);
 
-  const similarDesigns = designs
-    .filter((d) => d.id !== design.id && (d.category === design.category || d.machine === design.machine))
-    .slice(0, 3);
+  const gallery = useMemo(() => {
+    if (!design) return [];
+    const images = design.images.map((image) => normalizeAssetUrl(image.uri)).filter((uri): uri is string => Boolean(uri));
+    const fallback = normalizeAssetUrl(design.imageUri);
+    if (images.length === 0 && fallback) images.push(fallback);
+    return images;
+  }, [design]);
 
-  const creatorDesigns = designs
-    .filter((d) => d.id !== design.id && d.sellerId === design.sellerId)
-    .slice(0, 3);
+  if (loading) return <DesignDetailSkeleton />;
+  if (error || !design) return <main className="mx-auto min-h-[60vh] max-w-3xl px-4 py-16"><div className="rounded-2xl border border-red-200 bg-red-50 p-8 text-center text-red-900"><AlertCircle className="mx-auto h-8 w-8" /><h1 className="mt-3 font-serif text-2xl font-semibold">Design unavailable</h1><p className="mt-2 text-sm">{error || 'This design could not be found.'}</p><div className="mt-5 flex justify-center gap-3"><Link to="/explore" className="rounded-lg border border-red-300 px-4 py-2 text-sm font-semibold">Back to designs</Link><button type="button" onClick={() => setReloadKey((value) => value + 1)} className="rounded-lg bg-red-900 px-4 py-2 text-sm font-semibold text-white">Try again</button></div></div></main>;
 
-  const handleShare = () => {
-    navigator.clipboard?.writeText(window.location.href);
-    showToast('Link Copied', 'Design URL copied to clipboard.', 'info');
-  };
-
-  const handleDownloadFile = (fileName: string) => {
-    showToast('Download Started', `Preparing file: ${fileName}`, 'success');
+  const machineName = filters?.machineTypes.find((item) => item.id === design.machineTypeId)?.name || design.machineTypeId || 'Not specified';
+  const share = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      setShareMessage('Link copied');
+    } catch {
+      setShareMessage('Copy the URL from your browser');
+    }
+    window.setTimeout(() => setShareMessage(''), 2500);
   };
 
   return (
-    <div className="min-h-screen bg-[#FAF8F5] pb-24">
-      {/* Lightbox Modal */}
-      {lightboxOpen && (
-        <div className="fixed inset-0 z-50 bg-stone-950/95 flex items-center justify-center p-4">
-          <button
-            onClick={() => setLightboxOpen(false)}
-            className="absolute top-6 right-6 text-white/70 hover:text-white p-2 rounded-full bg-stone-900/60"
-          >
-            <X className="w-6 h-6" />
-          </button>
-          <img
-            src={design.images[activeImageIndex] || design.images[0]}
-            alt={design.title}
-            className="max-h-[85vh] max-w-[90vw] object-contain rounded-lg"
-          />
-        </div>
-      )}
+    <main className="min-h-screen bg-[#FAF8F5] pb-24">
+      {lightboxOpen && gallery[activeImage] && <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/95 p-4" role="dialog" aria-modal="true" aria-label="Design image preview"><button type="button" onClick={() => setLightboxOpen(false)} aria-label="Close preview" className="absolute right-6 top-6 rounded-full bg-stone-800 p-2 text-white"><X className="h-6 w-6" /></button><img src={gallery[activeImage]} alt={design.title} className="max-h-[88vh] max-w-[92vw] rounded-lg object-contain" /></div>}
+      <div className="border-b border-stone-200 bg-white py-3"><div className="mx-auto flex max-w-7xl items-center gap-2 px-4 text-xs text-stone-500 sm:px-6 lg:px-8"><Link to="/">Home</Link><span>/</span><Link to="/explore">Explore</Link><span>/</span>{design.categoryId ? <Link to={`/explore?category=${encodeURIComponent(design.categoryId)}`}>{design.categoryName || 'Category'}</Link> : <span>{design.categoryName || 'Category'}</span>}<span>/</span><span className="truncate font-medium text-stone-900">{design.title}</span></div></div>
+      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <div className="grid items-start gap-10 lg:grid-cols-12">
+          <div className="space-y-5 lg:col-span-7">
+            <div className="relative aspect-[4/3] overflow-hidden rounded-2xl border border-stone-200 bg-stone-100 shadow-sm">{gallery[activeImage] ? <img src={gallery[activeImage]} alt={design.title} className="h-full w-full object-contain" /> : <div className="flex h-full items-center justify-center text-sm text-stone-400">No preview image</div>}{gallery[activeImage] && <button type="button" onClick={() => setLightboxOpen(true)} aria-label="Open full image" className="absolute bottom-4 right-4 rounded-xl bg-stone-900/85 p-2.5 text-white"><Maximize2 className="h-4 w-4" /></button>}</div>
+            {gallery.length > 1 && <div className="flex gap-3 overflow-x-auto pb-2">{gallery.map((image, index) => <button type="button" key={image} onClick={() => setActiveImage(index)} className={`h-20 w-20 shrink-0 overflow-hidden rounded-xl border-2 ${activeImage === index ? 'border-amber-800' : 'border-stone-200'}`}><img src={image} alt={`${design.title} preview ${index + 1}`} className="h-full w-full object-cover" /></button>)}</div>}
+            <DesignTypeSection design={design} />
+            <section className="rounded-2xl border border-stone-200 bg-white p-6"><h2 className="font-serif text-lg font-semibold text-stone-950">Files listed with this design</h2>{design.files.length > 0 ? <ul className="mt-4 divide-y divide-stone-100">{design.files.map((file, index) => <li key={`${file.name}-${index}`} className="flex items-center gap-3 py-3"><FileCheck className="h-4 w-4 text-amber-800" /><div><p className="text-sm font-semibold text-stone-900">{file.displayName || file.name}</p><p className="text-xs text-stone-500">Download access is confirmed after purchase.</p></div></li>)}</ul> : <p className="mt-3 text-sm text-stone-500">No file metadata is currently available.</p>}</section>
+          </div>
 
-      {/* Breadcrumb Bar */}
-      <div className="bg-white border-b border-stone-200 py-3.5">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-xs text-stone-500 flex items-center gap-2">
-          <Link to="/" className="hover:text-stone-900">Home</Link>
-          <span>/</span>
-          <Link to="/explore" className="hover:text-stone-900">Explore</Link>
-          <span>/</span>
-          <Link to={`/explore?category=${encodeURIComponent(design.category)}`} className="hover:text-stone-900">
-            {design.category}
-          </Link>
-          <span>/</span>
-          <span className="text-stone-900 font-medium truncate">{design.title}</span>
+          <aside className="space-y-5 lg:sticky lg:top-28 lg:col-span-5"><section className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm"><div className="flex items-center justify-between gap-4 text-xs text-stone-500"><span className="font-semibold uppercase tracking-wider text-amber-900">{design.categoryName || 'Uncategorized'}</span><div className="relative"><button type="button" onClick={share} aria-label="Share design" className="rounded-lg border border-stone-200 p-2"><Share2 className="h-4 w-4" /></button>{shareMessage && <span className="absolute right-0 top-11 z-10 w-max rounded-md bg-stone-950 px-2 py-1 text-[10px] text-white">{shareMessage}</span>}</div></div><h1 className="mt-4 font-serif text-3xl font-bold leading-tight text-stone-950">{design.title}</h1><dl className="mt-6 grid grid-cols-2 gap-4 rounded-xl bg-stone-50 p-4 text-xs"><div><dt className="text-stone-500">Machine type</dt><dd className="mt-1 font-semibold text-stone-900">{machineName}</dd></div><div><dt className="text-stone-500">File type</dt><dd className="mt-1 font-semibold text-stone-900">{design.designFileTypeName || design.designFileExtension?.toUpperCase() || 'Not specified'}</dd></div><div><dt className="text-stone-500">Sequence</dt><dd className="mt-1 font-semibold text-stone-900">{design.sequenceType || 'Not specified'}</dd></div><div><dt className="text-stone-500">Published</dt><dd className="mt-1 font-semibold text-stone-900">{design.publishDate || 'Not specified'}</dd></div></dl><div className="mt-6 border-t border-stone-100 pt-5"><p className="text-xs uppercase tracking-wider text-stone-400">Price</p><p className="mt-1 font-mono text-3xl font-bold text-stone-950">{design.showPrice ? inr(design.pricePaise) : 'Price hidden'}</p></div><div className="mt-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950"><p className="font-semibold">Live catalog details are connected.</p><p className="mt-1 text-xs leading-5 text-amber-800">Authentication, purchase status, checkout and protected downloads will be connected in the next phases.</p></div><button type="button" disabled className="mt-4 w-full cursor-not-allowed rounded-xl bg-stone-200 px-4 py-3 text-sm font-semibold text-stone-500">Checkout integration pending</button></section></aside>
         </div>
+
+        {related.length > 0 && <section className="mt-16 border-t border-stone-200 pt-10"><div className="flex items-end justify-between"><div><p className="text-xs font-bold uppercase tracking-[0.18em] text-amber-800">More designs</p><h2 className="mt-2 font-serif text-2xl font-semibold text-stone-950">Similar category results</h2></div>{design.categoryId && <Link to={`/explore?category=${encodeURIComponent(design.categoryId)}`} className="text-sm font-semibold text-amber-900">View all</Link>}</div><div className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">{related.map((item) => <DesignCard key={item.id} design={toDesignCard(item, filters)} />)}</div></section>}
       </div>
-
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8">
-        
-        {/* Owner Banner if user is the seller */}
-        {isOwner && (
-          <div className="mb-6 p-4 rounded-xl bg-amber-50 border border-amber-200/80 flex items-center justify-between">
-            <div className="flex items-center gap-2.5 text-xs text-amber-900">
-              <Sparkles className="w-4 h-4 text-amber-700" />
-              <span>
-                <strong>Studio Preview:</strong> You are viewing your own listed design as it appears to buyers.
-              </span>
-            </div>
-            <Link
-              to={`/studio/designs`}
-              className="text-xs font-semibold text-amber-900 bg-amber-200/60 hover:bg-amber-200 px-3 py-1.5 rounded-lg flex items-center gap-1.5"
-            >
-              <Edit3 className="w-3.5 h-3.5" />
-              Manage in Studio
-            </Link>
-          </div>
-        )}
-
-        {/* Main PDP Grid: Gallery Left, Sticky Purchase Module Right */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
-          
-          {/* Gallery Column (7 cols) */}
-          <div className="lg:col-span-7 space-y-4">
-            
-            {/* Primary Large Image */}
-            <div className="relative aspect-[4/3] bg-stone-100 rounded-2xl overflow-hidden border border-stone-200 shadow-sm group">
-              <img
-                src={design.images[activeImageIndex] || design.images[0]}
-                alt={design.title}
-                referrerPolicy="no-referrer"
-                className="w-full h-full object-cover"
-              />
-              <button
-                onClick={() => setLightboxOpen(true)}
-                className="absolute bottom-4 right-4 bg-stone-900/80 hover:bg-stone-900 text-white p-2.5 rounded-xl shadow-md backdrop-blur-sm transition-all"
-                title="View High-Resolution Stitch Zoom"
-              >
-                <Maximize2 className="w-4 h-4" />
-              </button>
-
-              {purchased && (
-                <div className="absolute top-4 left-4 bg-emerald-800 text-white text-xs font-bold px-3 py-1 rounded-md shadow-md flex items-center gap-1.5">
-                  <CheckCircle2 className="w-4 h-4" />
-                  Purchased & Licensed
-                </div>
-              )}
-            </div>
-
-            {/* Thumbnail Row */}
-            {design.images.length > 1 && (
-              <div className="flex gap-3 overflow-x-auto pb-2">
-                {design.images.map((img, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => setActiveImageIndex(idx)}
-                    className={`w-20 h-20 rounded-xl overflow-hidden border-2 transition-all shrink-0 ${
-                      activeImageIndex === idx ? 'border-amber-800 ring-2 ring-amber-800/20' : 'border-stone-200 opacity-70 hover:opacity-100'
-                    }`}
-                  >
-                    <img src={img} alt={`Thumbnail ${idx + 1}`} className="w-full h-full object-cover" />
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {/* Technical Specifications Matrix */}
-            <div className="mt-8 bg-white rounded-2xl border border-stone-200/90 p-6 space-y-6">
-              <h3 className="font-serif text-lg font-bold text-stone-900 border-b border-stone-100 pb-3">
-                Design specifications
-              </h3>
-
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-xs">
-                <div className="p-3 bg-stone-50 rounded-xl border border-stone-200/60">
-                  <span className="text-stone-500 uppercase tracking-wider block text-[10px]">Stitch Count</span>
-                  <span className="font-mono font-bold text-stone-900 text-base tabular-nums">
-                    {design.stitches.toLocaleString()}
-                  </span>
-                </div>
-
-                <div className="p-3 bg-stone-50 rounded-xl border border-stone-200/60">
-                  <span className="text-stone-500 uppercase tracking-wider block text-[10px]">Active Needles</span>
-                  <span className="font-mono font-bold text-stone-900 text-base">
-                    {design.needles} Needles
-                  </span>
-                </div>
-
-                <div className="p-3 bg-stone-50 rounded-xl border border-stone-200/60">
-                  <span className="text-stone-500 uppercase tracking-wider block text-[10px]">Dimensions (H × W)</span>
-                  <span className="font-mono font-bold text-stone-900 text-base tabular-nums">
-                    {design.heightMm} × {design.widthMm} mm
-                  </span>
-                </div>
-
-                <div className="p-3 bg-stone-50 rounded-xl border border-stone-200/60">
-                  <span className="text-stone-500 uppercase tracking-wider block text-[10px]">Total Stitch Area</span>
-                  <span className="font-mono font-bold text-stone-900 text-base tabular-nums">
-                    {design.areaCm2} cm²
-                  </span>
-                </div>
-
-                <div className="p-3 bg-stone-50 rounded-xl border border-stone-200/60">
-                  <span className="text-stone-500 uppercase tracking-wider block text-[10px]">Sequence Mode</span>
-                  <span className="font-medium text-stone-900 text-xs">
-                    {design.sequenceType}
-                  </span>
-                </div>
-
-                <div className="p-3 bg-stone-50 rounded-xl border border-stone-200/60">
-                  <span className="text-stone-500 uppercase tracking-wider block text-[10px]">Machine Type</span>
-                  <span className="font-medium text-stone-900 text-xs">
-                    {design.machineType}
-                  </span>
-                </div>
-              </div>
-
-              {/* Techniques / Design types */}
-              <div>
-                <span className="text-xs font-semibold text-stone-700 block mb-2">
-                  Design types
-                </span>
-                <div className="flex flex-wrap gap-2 text-xs">
-                  {design.designTypes.map((type) => (
-                    <span
-                      key={type}
-                      className="px-2.5 py-1 bg-amber-50 text-amber-900 border border-amber-200/60 rounded-md font-medium"
-                    >
-                      {type}
-                    </span>
-                  ))}
-                </div>
-              </div>
-
-              {/* Description & Digitizer Notes */}
-              <div className="pt-4 border-t border-stone-100">
-                <h4 className="text-xs font-semibold text-stone-900 uppercase tracking-wider mb-2">
-                  Digitizer Notes & Fabric Suitability
-                </h4>
-                <p className="text-xs text-stone-600 leading-relaxed">
-                  {design.description}
-                </p>
-              </div>
-
-            </div>
-
-            {/* Included Production Files List */}
-            <div className="bg-white rounded-2xl border border-stone-200/90 p-6 space-y-4">
-              <h3 className="font-serif text-base font-bold text-stone-900">
-                Package Contents ({design.files.length} Production Files)
-              </h3>
-              <div className="divide-y divide-stone-100">
-                {design.files.map((file, i) => (
-                  <div key={i} className="py-2.5 flex items-center justify-between text-xs">
-                    <div className="flex items-center gap-2">
-                      <FileCheck className="w-4 h-4 text-amber-800" />
-                      <span className="font-mono font-medium text-stone-800">{file.name}</span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className="text-stone-400 font-mono">{file.size}</span>
-                      {purchased && (
-                        <button
-                          onClick={() => handleDownloadFile(file.name)}
-                          className="text-emerald-800 hover:text-emerald-950 font-semibold flex items-center gap-1 text-[11px]"
-                        >
-                          <Download className="w-3 h-3" />
-                          Download
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-          </div>
-
-          {/* Sticky Purchase Module (5 cols) per E-Commerce Reference Section 2.A */}
-          <div className="lg:col-span-5 space-y-6 lg:sticky lg:top-28">
-            <div className="bg-white rounded-2xl border border-stone-200/90 p-6 shadow-sm space-y-6">
-              
-              {/* Category & Status */}
-              <div className="flex items-center justify-between text-xs text-stone-500">
-                <div className="flex items-center gap-2">
-                  <span className="uppercase font-semibold tracking-wider text-amber-900">
-                    {design.category}
-                  </span>
-                  <span>·</span>
-                  <span>{design.machine}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={handleShare}
-                    className="p-1.5 text-stone-500 hover:text-stone-900 rounded-lg border border-stone-200"
-                    title="Share design link"
-                  >
-                    <Share2 className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    onClick={() => toggleSaveDesign(design.id)}
-                    className={`p-1.5 rounded-lg border transition-colors ${
-                      saved ? 'bg-rose-50 border-rose-200 text-rose-600' : 'text-stone-500 hover:text-stone-900 border-stone-200'
-                    }`}
-                    title={saved ? 'Remove from saved' : 'Save design'}
-                  >
-                    <Heart className={`w-3.5 h-3.5 ${saved ? 'fill-current' : ''}`} />
-                  </button>
-                </div>
-              </div>
-
-              {/* Title */}
-              <h1 className="font-serif text-2xl font-bold text-stone-900 leading-snug">
-                {design.title}
-              </h1>
-
-              {/* Seller snippet */}
-              <div className="flex items-center justify-between p-3 bg-stone-50 rounded-xl border border-stone-100 text-xs">
-                <div className="flex items-center gap-3">
-                  <img
-                    src={design.sellerAvatar}
-                    alt={design.sellerName}
-                    className="w-10 h-10 rounded-full object-cover ring-1 ring-stone-200"
-                  />
-                  <div>
-                    <h5 className="font-semibold text-stone-900">{design.sellerName}</h5>
-                    <p className="text-[11px] text-stone-500">Master Digitizer · Surat Certified</p>
-                  </div>
-                </div>
-                <Link
-                  to={`/creator/${design.sellerId}`}
-                  className="text-xs font-semibold text-amber-900 hover:underline shrink-0"
-                >
-                  View Profile
-                </Link>
-              </div>
-
-              {/* Pricing & Commercial License */}
-              <div className="pt-2 border-t border-stone-100">
-                <div className="flex items-baseline justify-between mb-1">
-                  <div className="text-3xl font-bold font-mono tabular-nums text-stone-900">
-                    ₹{design.price.toLocaleString('en-IN')}
-                  </div>
-                  <span className="text-xs text-stone-500 font-medium">Full Commercial License</span>
-                </div>
-                <p className="text-[11px] text-stone-500">
-                  Unlimited factory garment production runs with no recurring royalties.
-                </p>
-              </div>
-
-              {/* Primary Actions */}
-              <div className="space-y-3 pt-2">
-                {purchased ? (
-                  <div className="space-y-2">
-                    <button
-                      onClick={() => handleDownloadFile(`${design.title.replace(/\s+/g, '_')}_master_archive.zip`)}
-                      className="w-full py-3.5 px-4 bg-emerald-800 hover:bg-emerald-900 text-white font-semibold rounded-xl text-xs flex items-center justify-center gap-2 shadow-md transition-colors"
-                    >
-                      <Download className="w-4 h-4" />
-                      Download Complete Multi-Format Archive (ZIP)
-                    </button>
-                    <Link
-                      to="/account/purchases"
-                      className="block text-center text-xs text-stone-600 hover:text-stone-900 font-medium"
-                    >
-                      View in my purchases
-                    </Link>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => navigate(`/checkout/design/${design.id}`)}
-                    className="w-full py-3.5 px-4 bg-stone-900 hover:bg-stone-800 text-white font-semibold rounded-xl text-xs flex items-center justify-center gap-2 shadow-md transition-colors"
-                  >
-                    Buy Now & Download Files
-                    <ArrowRight className="w-4 h-4" />
-                  </button>
-                )}
-
-                <p className="text-[11px] text-stone-400 text-center">
-                  Eligible files become available after payment confirmation.
-                </p>
-              </div>
-
-              {/* Machine Compatibility Pills / Format Checklist */}
-              <div className="pt-4 border-t border-stone-100 space-y-2 text-xs">
-                  <span className="font-semibold text-stone-800 block">Available formats</span>
-                <div className="flex flex-wrap gap-2 text-stone-600">
-                  {design.formats.map((format) => (
-                    <span key={format} className="inline-flex items-center gap-1.5 rounded-lg border border-stone-200 bg-stone-50 px-2.5 py-1.5">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-700" />
-                      {format}
-                    </span>
-                  ))}
-                </div>
-              </div>
-
-            </div>
-          </div>
-
-        </div>
-
-        {/* Similar Designs Row */}
-        {similarDesigns.length > 0 && (
-          <section className="mt-16 pt-12 border-t border-stone-200">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="font-serif text-xl font-bold text-stone-900">
-                Similar {design.category} Files
-              </h3>
-              <Link to={`/explore?category=${encodeURIComponent(design.category)}`} className="text-xs font-semibold text-amber-900 hover:underline">
-                View all in category
-              </Link>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {similarDesigns.map((d) => (
-                <DesignCard key={d.id} design={d} />
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* More from this Creator */}
-        {creatorDesigns.length > 0 && (
-          <section className="mt-12 pt-12 border-t border-stone-200">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="font-serif text-xl font-bold text-stone-900">
-                More from {design.sellerName}
-              </h3>
-              <Link to={`/creator/${design.sellerId}`} className="text-xs font-semibold text-amber-900 hover:underline">
-                Visit full studio
-              </Link>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {creatorDesigns.map((d) => (
-                <DesignCard key={d.id} design={d} />
-              ))}
-            </div>
-          </section>
-        )}
-
-      </div>
-    </div>
+    </main>
   );
 };
+
+const DesignTypeSection: React.FC<{ design: ApiDesign }> = ({ design }) => {
+  if (design.designTypes.length === 0) {
+    return (
+      <section className="rounded-2xl border border-stone-200 bg-white p-6">
+        <h2 className="font-serif text-lg font-semibold text-stone-950">Design type specifications</h2>
+        <p className="mt-4 text-sm text-stone-500">No design-type specifications are available.</p>
+      </section>
+    );
+  }
+
+  if (design.designTypeImageCards) {
+    return (
+      <section className="rounded-2xl border border-stone-200 bg-white p-6">
+        <h2 className="font-serif text-lg font-semibold text-stone-950">Design components</h2>
+        <p className="mt-1 text-xs text-stone-500">Preview each design type included with this design.</p>
+        <div className="mt-5 grid gap-4 sm:grid-cols-2">
+          {design.designTypes.map((type, index) => {
+            const image = normalizeAssetUrl(type.details.image?.thumbnailUri || type.details.image?.uri);
+            const typeName = type.typeName || type.customTypeName || 'Custom type';
+            return (
+              <article key={`${type.typeId || typeName}-${index}`} className="overflow-hidden rounded-xl border border-stone-200 bg-stone-50">
+                <div className="aspect-[4/3] bg-stone-100">
+                  {image ? <img src={image} alt={typeName} className="h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center px-4 text-center text-xs text-stone-400">No component image</div>}
+                </div>
+                <div className="p-4">
+                  <h3 className="font-serif text-lg font-semibold text-stone-950">{typeName}</h3>
+                  {type.details.nameOrNumber && <p className="mt-1 text-sm text-stone-600">{type.details.nameOrNumber}</p>}
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section className="rounded-2xl border border-stone-200 bg-white p-6">
+      <h2 className="font-serif text-lg font-semibold text-stone-950">Design type specifications</h2>
+      <p className="mt-1 text-xs text-stone-500">Measurements are shown in {design.measurementUnit || 'mm'}.</p>
+      <div className="mt-5 grid gap-4">
+        {design.designTypes.map((type, index) => {
+          const typeName = type.typeName || type.customTypeName || 'Custom type';
+          return (
+            <article key={`${type.typeId || typeName}-${index}`} className="rounded-xl border border-stone-200 bg-stone-50 p-4">
+              <h3 className="font-serif text-lg font-semibold text-stone-950">{typeName}</h3>
+              {type.details.nameOrNumber && <p className="mt-1 text-xs text-stone-500">{type.details.nameOrNumber}</p>}
+              <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 text-xs sm:grid-cols-3">
+                <Spec label="Stitches" value={numeric(type.details.stitchCount).toLocaleString('en-IN')} />
+                <Spec label="Needles" value={String(numeric(type.details.needle))} />
+                <Spec label="Area" value={String(type.details.area ?? 0)} />
+                <Spec label="Height" value={`${type.details.height ?? 0} ${design.measurementUnit}`} />
+                <Spec label="Width" value={`${type.details.width ?? 0} ${design.measurementUnit}`} />
+              </dl>
+            </article>
+          );
+        })}
+      </div>
+    </section>
+  );
+};
+
+const Spec: React.FC<{ label: string; value: string }> = ({ label, value }) => <div><dt className="text-stone-500">{label}</dt><dd className="mt-0.5 font-mono font-semibold text-stone-900">{value}</dd></div>;
+const DesignDetailSkeleton = () => <main className="mx-auto min-h-screen max-w-7xl px-4 py-10 sm:px-6 lg:px-8"><div className="grid animate-pulse gap-10 lg:grid-cols-12"><div className="aspect-[4/3] rounded-2xl bg-stone-200 lg:col-span-7" /><div className="space-y-5 rounded-2xl border border-stone-200 bg-white p-6 lg:col-span-5"><div className="h-4 w-28 rounded bg-stone-200" /><div className="h-12 w-3/4 rounded bg-stone-200" /><div className="h-32 rounded bg-stone-100" /></div></div></main>;

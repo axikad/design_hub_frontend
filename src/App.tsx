@@ -68,7 +68,7 @@ export default function App() {
         <div className="flex flex-col min-h-screen text-stone-900 bg-[#FAF8F5]">
           <Header />
           <div className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-center text-[11px] font-medium text-amber-950">
-            Prototype preview — marketplace data and actions are simulated until API integration is complete.
+            Live marketplace catalog · Account, checkout and studio actions remain preview-only until their API phases are completed.
           </div>
           <div className="flex-1">
             <Suspense fallback={<PageLoading />}>

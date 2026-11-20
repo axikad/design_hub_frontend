@@ -2,10 +2,10 @@ import React from 'react';
 import { CheckCircle2, Heart } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
-import type { DesignItem } from '../../data/mockData';
+import type { DesignCardData } from '../../types/marketplace';
 
 interface DesignCardProps {
-  design: DesignItem;
+  design: DesignCardData;
   viewMode?: 'grid' | 'list';
 }
 
@@ -17,15 +17,23 @@ const formatInr = (value: number) =>
   }).format(value);
 
 export const DesignCard: React.FC<DesignCardProps> = ({ design, viewMode = 'grid' }) => {
-  const { isSaved, toggleSaveDesign, isPurchased } = useApp();
+  const { user, isSaved, toggleSaveDesign, isPurchased, showToast } = useApp();
   const saved = isSaved(design.id);
-  const purchased = isPurchased(design.id);
+  const purchased = user.isLoggedIn && isPurchased(design.id);
   const preview = design.images[0];
+
+  const handleSave = () => {
+    if (!user.isLoggedIn) {
+      showToast('Sign in required', 'Saved designs will be connected with account authentication in Phase 3.', 'info');
+      return;
+    }
+    toggleSaveDesign(design.id);
+  };
 
   const saveButton = (
     <button
       type="button"
-      onClick={() => toggleSaveDesign(design.id)}
+      onClick={handleSave}
       className={`inline-flex h-9 w-9 items-center justify-center rounded-full border shadow-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-700 focus-visible:ring-offset-2 ${
         saved
           ? 'border-rose-200 bg-rose-500 text-white'

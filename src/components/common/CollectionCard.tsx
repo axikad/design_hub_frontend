@@ -1,16 +1,20 @@
 import React from 'react';
 import { ArrowRight, Archive } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import type { CollectionItem } from '../../data/mockData';
+import type { FolderCardData } from '../../types/marketplace';
 
 interface CollectionCardProps {
-  collection: CollectionItem;
+  collection: FolderCardData;
 }
 
 export const CollectionCard: React.FC<CollectionCardProps> = ({ collection }) => (
   <article className="group overflow-hidden rounded-2xl border border-stone-200 bg-white transition hover:border-stone-300 hover:shadow-md">
     <Link to={`/collections/${collection.id}`} className="relative block aspect-[16/10] overflow-hidden bg-stone-100">
-      <img src={collection.coverImage} alt={collection.title} loading="lazy" className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.04]" />
+      {collection.coverImage ? (
+        <img src={collection.coverImage} alt={collection.title} loading="lazy" className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.04]" />
+      ) : (
+        <div className="flex h-full items-center justify-center text-sm text-stone-400">No folder preview</div>
+      )}
       <span className="absolute bottom-3 left-3 inline-flex items-center gap-1.5 rounded-md bg-stone-950/90 px-2.5 py-1 text-[11px] font-semibold text-white"><Archive className="h-3.5 w-3.5 text-amber-300" />{collection.designCount} files</span>
     </Link>
     <div className="p-5">
