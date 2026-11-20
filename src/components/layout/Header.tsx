@@ -84,7 +84,7 @@ export const Header: React.FC = () => {
                 </Link>
                 <div className="relative hidden sm:block">
                   <button type="button" onClick={() => setProfileOpen((value) => !value)} className="flex h-10 items-center gap-2 rounded-lg p-1.5 hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-700" aria-expanded={profileOpen} aria-label="Open account menu">
-                    <img src={user.avatar} alt="" className="h-7 w-7 rounded-full object-cover ring-1 ring-stone-300" />
+                    {user.avatar ? <img src={user.avatar} alt="" className="h-7 w-7 rounded-full object-cover ring-1 ring-stone-300" /> : <span className="flex h-7 w-7 items-center justify-center rounded-full bg-amber-100 text-xs font-bold text-amber-900 ring-1 ring-amber-200">{user.name.slice(0, 1).toUpperCase()}</span>}
                     <span className="hidden max-w-28 truncate text-xs font-semibold text-stone-700 xl:block">{user.name}</span>
                   </button>
                   {profileOpen && (
@@ -92,7 +92,7 @@ export const Header: React.FC = () => {
                       <div className="border-b border-stone-100 px-3 py-2"><p className="truncate text-sm font-semibold text-stone-950">{user.name}</p><p className="truncate text-xs text-stone-500">{user.email || user.phone}</p></div>
                       {user.role === 'seller' && <Link to="/studio" className="mt-1 flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-stone-700 hover:bg-stone-50"><Store className="h-4 w-4" />My studio</Link>}
                       <Link to="/account" className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-stone-700 hover:bg-stone-50"><User className="h-4 w-4" />Account</Link>
-                      <button type="button" onClick={() => { logout(); setProfileOpen(false); navigate('/'); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-rose-700 hover:bg-rose-50"><LogOut className="h-4 w-4" />Sign out</button>
+                      <button type="button" onClick={() => { void logout(); setProfileOpen(false); navigate('/'); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-rose-700 hover:bg-rose-50"><LogOut className="h-4 w-4" />Sign out</button>
                     </div>
                   )}
                 </div>

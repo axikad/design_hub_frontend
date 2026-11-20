@@ -11,13 +11,15 @@ import {
   DESIGNS as INITIAL_DESIGNS,
   COLLECTIONS as INITIAL_COLLECTIONS,
   CREATORS,
-  INITIAL_PURCHASES,
   INITIAL_EARNINGS,
   INITIAL_SETTLEMENT_CYCLES,
   INITIAL_WITHDRAWALS,
   INITIAL_LEDGER,
   ASSET_IMAGES,
 } from '../data/mockData';
+import { accountApi, ApiError, authApi, sessionToken } from '../lib/api-client';
+import { normalizeAssetUrl } from '../lib/marketplace-mappers';
+import type { ApiPurchase, ApiUser, AuthResult } from '../types/account';
 
 export interface ToastMessage {
   id: string;
@@ -41,6 +43,7 @@ export interface UserProfile {
   companyName: string;
   gstNumber: string;
   location: string;
+  permissions: string[];
 }
 
 interface AppContextType {
@@ -64,10 +67,11 @@ interface AppContextType {
   withdrawals: WithdrawalRequest[];
   ledger: LedgerItem[];
   toasts: ToastMessage[];
+  authReady: boolean;
   // Actions
   showToast: (title: string, message?: string, type?: 'success' | 'info' | 'error') => void;
   removeToast: (id: string) => void;
-  toggleSaveDesign: (id: string) => void;
+  toggleSaveDesign: (id: string) => Promise<void>;
   isSaved: (id: string) => boolean;
   isPurchased: (id: string) => boolean;
   addPurchase: (item: DesignItem | CollectionItem, type: 'design' | 'collection', amount: number) => PurchaseRecord;
@@ -79,32 +83,70 @@ interface AppContextType {
   cancelWithdrawal: (id: string) => void;
   setSettlementMode: (mode: 'manual' | 'automatic') => void;
   updateUserProfile: (updates: Partial<UserProfile>) => void;
-  toggleUserRole: () => void;
-  login: (identifier: string, name?: string) => void;
-  logout: () => void;
+  establishSession: (result: AuthResult) => Promise<void>;
+  refreshUser: () => Promise<void>;
+  logout: () => Promise<void>;
   searchQuery: string;
   setSearchQuery: (query: string) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
+const emptyUser: UserProfile = {
+  id: '',
+  name: '',
+  email: '',
+  phone: '',
+  countryCode: '+91',
+  avatar: '',
+  role: 'buyer',
+  machinePreferences: [],
+  settlementMode: 'manual',
+  isLoggedIn: false,
+  bankAccount: '',
+  companyName: '',
+  gstNumber: '',
+  location: '',
+  permissions: [],
+};
+
+const canUseSellerTools = (user: ApiUser) =>
+  user.permissions.includes('marketplace.manage_own') ||
+  user.permissions.some((permission) => permission.endsWith('.view_own') || permission.endsWith('.create_own'));
+
+const mapUser = (user: ApiUser): UserProfile => ({
+  ...emptyUser,
+  id: user.id,
+  name: user.name,
+  email: user.email ?? '',
+  phone: user.mobileNumber ?? '',
+  countryCode: user.countryCode ?? '+91',
+  avatar: normalizeAssetUrl(user.avatarUri) ?? '',
+  role: canUseSellerTools(user) ? 'seller' : 'buyer',
+  machinePreferences: user.selectedMachineIds,
+  settlementMode: user.sellerSettlementMode ?? 'manual',
+  isLoggedIn: true,
+  permissions: user.permissions,
+});
+
+const mapPurchase = (purchase: ApiPurchase): PurchaseRecord => ({
+  id: purchase.id,
+  orderNumber: purchase.id,
+  type: 'design',
+  itemId: purchase.design.id,
+  itemTitle: purchase.design.title,
+  itemImage: normalizeAssetUrl(purchase.design.images[0]?.thumbnailUri || purchase.design.images[0]?.uri || purchase.design.imageUri) ?? '',
+  category: purchase.design.categoryName ?? 'Uncategorized',
+  sellerName: 'Marketplace seller',
+  amountPaid: purchase.amountPaise / 100,
+  date: purchase.purchasedAt ?? '',
+  status: 'completed',
+  downloadUrls: [],
+});
+
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<UserProfile>({
-    id: 'creator-1',
-    name: 'Surat Embroidery Works',
-    email: 'digitizing@suratembroidery.in',
-    phone: '9825012345',
-    countryCode: '+91',
-    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
-    role: 'seller', // Temporary preview role used after the simulated sign-in flow.
-    machinePreferences: ['Multi-head Embroidery', 'Schiffli', 'Ari / Sequence Multi'],
-    settlementMode: 'manual',
-    isLoggedIn: false,
-    bankAccount: 'HDFC Bank ending in 4082',
-    companyName: 'Surat Embroidery Digitizing LLP',
-    gstNumber: '24AAECS1234E1Z7',
-    location: 'Surat, Gujarat',
-  });
+  const [user, setUser] = useState<UserProfile>(emptyUser);
+  const [authReady, setAuthReady] = useState(false);
 
   const [designs, setDesigns] = useState<DesignItem[]>(() => {
     const saved = localStorage.getItem('tdh_designs');
@@ -116,15 +158,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return saved ? JSON.parse(saved) : INITIAL_COLLECTIONS;
   });
 
-  const [savedDesignIds, setSavedDesignIds] = useState<string[]>(() => {
-    const saved = localStorage.getItem('tdh_saved_designs');
-    return saved ? JSON.parse(saved) : ['des-101', 'des-103'];
-  });
+  const [savedDesignIds, setSavedDesignIds] = useState<string[]>([]);
 
-  const [purchases, setPurchases] = useState<PurchaseRecord[]>(() => {
-    const saved = localStorage.getItem('tdh_purchases');
-    return saved ? JSON.parse(saved) : INITIAL_PURCHASES;
-  });
+  const [purchases, setPurchases] = useState<PurchaseRecord[]>([]);
 
   const [wallet, setWallet] = useState({
     pending: 18450,
@@ -152,14 +188,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.setItem('tdh_collections', JSON.stringify(collections));
   }, [collections]);
 
-  useEffect(() => {
-    localStorage.setItem('tdh_saved_designs', JSON.stringify(savedDesignIds));
-  }, [savedDesignIds]);
-
-  useEffect(() => {
-    localStorage.setItem('tdh_purchases', JSON.stringify(purchases));
-  }, [purchases]);
-
   const showToast = (title: string, message?: string, type: 'success' | 'info' | 'error' = 'success') => {
     const id = 'toast_' + Math.random().toString(36).substring(2, 9);
     setToasts((prev) => [...prev, { id, title, message, type }]);
@@ -172,17 +200,77 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setToasts((prev) => prev.filter((t) => t.id !== id));
   };
 
-  const toggleSaveDesign = (id: string) => {
-    setSavedDesignIds((prev) => {
-      const exists = prev.includes(id);
-      if (exists) {
-        showToast('Design Removed', 'Removed from your saved designs wishlist.', 'info');
-        return prev.filter((item) => item !== id);
-      } else {
-        showToast('Design Saved', 'Added to your saved designs collection.', 'success');
-        return [...prev, id];
+  const loadAccountCollections = async () => {
+    const [saved, paid] = await Promise.all([
+      accountApi.savedDesigns({ page: 1, per_page: 100 }),
+      accountApi.purchases({ page: 1, per_page: 100 }),
+    ]);
+    setSavedDesignIds(saved.data.map((design) => design.id));
+    setPurchases(paid.data.map(mapPurchase));
+  };
+
+  const refreshUser = async () => {
+    const response = await authApi.me();
+    setUser(mapUser(response.data));
+  };
+
+  useEffect(() => {
+    let active = true;
+    const bootstrap = async () => {
+      if (!sessionToken.get()) {
+        if (active) setAuthReady(true);
+        return;
       }
-    });
+      try {
+        const response = await authApi.me();
+        if (!active) return;
+        setUser(mapUser(response.data));
+        try {
+          await loadAccountCollections();
+        } catch {
+          setSavedDesignIds([]);
+          setPurchases([]);
+        }
+      } catch {
+        if (active) {
+          sessionToken.clear();
+          setUser(emptyUser);
+          setSavedDesignIds([]);
+          setPurchases([]);
+        }
+      } finally {
+        if (active) setAuthReady(true);
+      }
+    };
+    const unauthorized = () => {
+      setUser(emptyUser);
+      setSavedDesignIds([]);
+      setPurchases([]);
+      setAuthReady(true);
+    };
+    window.addEventListener('designhub:unauthorized', unauthorized);
+    void bootstrap();
+    return () => {
+      active = false;
+      window.removeEventListener('designhub:unauthorized', unauthorized);
+    };
+  }, []);
+
+  const toggleSaveDesign = async (id: string) => {
+    const exists = savedDesignIds.includes(id);
+    try {
+      if (exists) {
+        await accountApi.unsaveDesign(id);
+        setSavedDesignIds((previous) => previous.filter((item) => item !== id));
+        showToast('Design removed', 'Removed from your saved designs.', 'info');
+      } else {
+        await accountApi.saveDesign(id);
+        setSavedDesignIds((previous) => previous.includes(id) ? previous : [...previous, id]);
+        showToast('Design saved', 'Added to your saved designs.', 'success');
+      }
+    } catch (error) {
+      showToast('Could not update saved designs', error instanceof ApiError ? error.message : 'Please try again.', 'error');
+    }
   };
 
   const isSaved = (id: string) => savedDesignIds.includes(id);
@@ -380,31 +468,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     showToast('Profile Updated', 'Your account settings have been saved.', 'success');
   };
 
-  const toggleUserRole = () => {
-    setUser((prev) => {
-      const newRole = prev.role === 'seller' ? 'buyer' : 'seller';
-      showToast(
-        newRole === 'seller' ? 'Switched to Creator / Studio Mode' : 'Switched to Buyer Mode',
-        newRole === 'seller' ? 'Accessing seller tools, uploads, and wallet.' : 'Browsing as a buyer/manufacturer.',
-        'info'
-      );
-      return { ...prev, role: newRole };
-    });
-  };
-
-  const login = (identifier: string, name?: string) => {
-    setUser((prev) => ({
-      ...prev,
-      isLoggedIn: true,
-      email: identifier.includes('@') ? identifier : prev.email,
-      phone: !identifier.includes('@') ? identifier : prev.phone,
-      name: name || prev.name,
-    }));
+  const establishSession = async (result: AuthResult) => {
+    sessionToken.set(result.accessToken);
+    setUser(mapUser(result.user));
+    setAuthReady(true);
+    try {
+      await loadAccountCollections();
+    } catch {
+      setSavedDesignIds([]);
+      setPurchases([]);
+    }
     showToast('Welcome to Textile Design Hub', 'Signed in successfully.', 'success');
   };
 
-  const logout = () => {
-    setUser((prev) => ({ ...prev, isLoggedIn: false }));
+  const logout = async () => {
+    try {
+      if (sessionToken.get()) await authApi.logout();
+    } catch {
+      // Local sign-out still completes when a token is expired or the network is unavailable.
+    }
+    sessionToken.clear();
+    setUser(emptyUser);
+    setSavedDesignIds([]);
+    setPurchases([]);
     showToast('Signed Out', 'You have been safely signed out.', 'info');
   };
 
@@ -423,6 +509,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         withdrawals,
         ledger,
         toasts,
+        authReady,
         showToast,
         removeToast,
         toggleSaveDesign,
@@ -437,8 +524,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         cancelWithdrawal,
         setSettlementMode,
         updateUserProfile,
-        toggleUserRole,
-        login,
+        establishSession,
+        refreshUser,
         logout,
         searchQuery,
         setSearchQuery,

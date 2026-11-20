@@ -28,7 +28,6 @@ const MyDesignsPage = page(() => import('./pages/studio/MyDesignsPage'), 'MyDesi
 const AddEditDesignPage = page(() => import('./pages/studio/AddEditDesignPage'), 'AddEditDesignPage');
 const MyCollectionsPage = page(() => import('./pages/studio/MyCollectionsPage'), 'MyCollectionsPage');
 const SellerWalletPage = page(() => import('./pages/studio/SellerWalletPage'), 'SellerWalletPage');
-const SettingsPage = page(() => import('./pages/SettingsPage'), 'SettingsPage');
 const AboutPage = page(() => import('./pages/legal/LegalPages'), 'AboutPage');
 const TermsPage = page(() => import('./pages/legal/LegalPages'), 'TermsPage');
 const PrivacyPage = page(() => import('./pages/legal/LegalPages'), 'PrivacyPage');
@@ -53,10 +52,11 @@ const PageLoading = () => (
 );
 
 const RequireAccount: React.FC<{ children: React.ReactNode; seller?: boolean }> = ({ children, seller = false }) => {
-  const { user } = useApp();
+  const { user, authReady } = useApp();
   const location = useLocation();
+  if (!authReady) return <PageLoading />;
   if (!user.isLoggedIn) return <Navigate to="/auth" replace state={{ returnTo: `${location.pathname}${location.search}` }} />;
-  if (seller && user.role !== 'seller') return <Navigate to="/account" replace state={{ accessMessage: 'Seller access is required for that page.' }} />;
+  if (seller && user.role !== 'seller') return <main className="mx-auto flex min-h-[55vh] max-w-xl items-center px-4 py-16"><div className="w-full rounded-2xl border border-amber-200 bg-amber-50 p-8 text-center"><p className="text-xs font-bold uppercase tracking-[0.18em] text-amber-800">403 · Permission required</p><h1 className="mt-3 font-serif text-2xl font-semibold text-stone-950">Creator access is not enabled</h1><p className="mt-2 text-sm leading-6 text-stone-600">Your account is signed in, but it does not have permission to use seller tools.</p></div></main>;
   return <>{children}</>;
 };
 
@@ -68,7 +68,7 @@ export default function App() {
         <div className="flex flex-col min-h-screen text-stone-900 bg-[#FAF8F5]">
           <Header />
           <div className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-center text-[11px] font-medium text-amber-950">
-            Live marketplace catalog · Account, checkout and studio actions remain preview-only until their API phases are completed.
+            Live marketplace catalog and buyer accounts · Checkout, downloads and studio mutations follow in the next phases.
           </div>
           <div className="flex-1">
             <Suspense fallback={<PageLoading />}>
@@ -100,7 +100,7 @@ export default function App() {
               <Route path="/studio/wallet" element={<RequireAccount seller><SellerWalletPage /></RequireAccount>} />
 
               {/* Settings, Legal & Support */}
-              <Route path="/settings" element={<RequireAccount><SettingsPage /></RequireAccount>} />
+              <Route path="/settings" element={<RequireAccount><Navigate to="/account?tab=security" replace /></RequireAccount>} />
               <Route path="/about" element={<AboutPage />} />
               <Route path="/terms" element={<TermsPage />} />
               <Route path="/privacy" element={<PrivacyPage />} />

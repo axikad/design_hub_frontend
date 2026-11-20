@@ -1,195 +1,46 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { AlertCircle, CheckCircle2, PackageOpen } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import {
-  Download,
-  Search,
-  CheckCircle2,
-  FileCheck,
-  ExternalLink,
-  PackageOpen,
-  Layers,
-  Sparkles
-} from 'lucide-react';
-import { useApp } from '../context/AppContext';
 import { EmptyState } from '../components/common/EmptyState';
+import { accountApi } from '../lib/api-client';
+import { normalizeAssetUrl } from '../lib/marketplace-mappers';
+import type { ApiPurchase } from '../types/account';
+import type { PaginationMeta } from '../types/marketplace';
+
+const money = (paise: number, currency: string) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: currency || 'INR' }).format(paise / 100);
+const date = (value: string | null) => value ? new Intl.DateTimeFormat('en-IN', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value)) : 'Date unavailable';
 
 export const PurchasesPage: React.FC = () => {
-  const { purchases, showToast } = useApp();
-  const [filterType, setFilterType] = useState<'all' | 'design' | 'collection'>('all');
-  const [searchTerm, setSearchTerm] = useState('');
+  const [items, setItems] = useState<ApiPurchase[]>([]);
+  const [meta, setMeta] = useState<PaginationMeta | null>(null);
+  const [page, setPage] = useState(1);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [reloadKey, setReloadKey] = useState(0);
 
-  const filteredPurchases = purchases.filter((item) => {
-    if (filterType !== 'all' && item.type !== filterType) return false;
-    if (searchTerm.trim()) {
-      const q = searchTerm.toLowerCase();
-      const matchTitle = item.itemTitle.toLowerCase().includes(q);
-      const matchOrder = item.orderNumber.toLowerCase().includes(q);
-      const matchSeller = item.sellerName.toLowerCase().includes(q);
-      if (!matchTitle && !matchOrder && !matchSeller) return false;
-    }
-    return true;
-  });
-
-  const handleDownload = (filename: string) => {
-    showToast('Download Started', `Preparing download: ${filename}`, 'success');
-  };
+  useEffect(() => {
+    const controller = new AbortController();
+    setLoading(true);
+    setError('');
+    accountApi.purchases({ page, per_page: 12 }, controller.signal)
+      .then((response) => { setItems(response.data); setMeta(response.meta); })
+      .catch((requestError) => {
+        if (requestError instanceof DOMException && requestError.name === 'AbortError') return;
+        setError(requestError instanceof Error ? requestError.message : 'Could not load purchases.');
+      })
+      .finally(() => setLoading(false));
+    return () => controller.abort();
+  }, [page, reloadKey]);
 
   return (
-    <div className="min-h-screen bg-[#FAF8F5] pb-24">
-      {/* Header */}
-      <div className="bg-white border-b border-stone-200 py-8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-amber-900 mb-1">
-                <span>Licensed Archives</span>
-                <span aria-hidden="true">·</span>
-                <span>Commercial Usage Allowed</span>
-              </div>
-              <h1 className="font-serif text-2xl sm:text-3xl font-bold text-stone-900">
-                Purchased Machine Files & Invoices
-              </h1>
-            </div>
+    <main className="min-h-screen bg-[#FAF8F5] pb-24">
+      <header className="border-b border-stone-200 bg-white py-8"><div className="mx-auto flex max-w-7xl flex-col justify-between gap-4 px-4 sm:flex-row sm:items-end sm:px-6 lg:px-8"><div><p className="text-xs font-bold uppercase tracking-[0.18em] text-amber-800">Buyer library</p><h1 className="mt-2 font-serif text-3xl font-bold text-stone-950">Your purchases</h1><p className="mt-1 text-sm text-stone-500">Paid design entitlements synchronized from your server account.</p></div><Link to="/explore" className="self-start rounded-xl bg-stone-950 px-4 py-2.5 text-sm font-semibold text-white">Browse designs</Link></div></header>
 
-            <Link
-              to="/explore"
-              className="px-4 py-2 text-xs font-semibold rounded-lg bg-stone-900 hover:bg-stone-800 text-white transition-colors self-start sm:self-auto"
-            >
-              Browse More Designs
-            </Link>
-          </div>
-        </div>
+      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        {loading ? <div className="space-y-4 animate-pulse">{Array.from({ length: 4 }).map((_, index) => <div key={index} className="h-32 rounded-2xl border border-stone-200 bg-white" />)}</div> : error ? <div className="rounded-2xl border border-rose-200 bg-rose-50 p-8 text-center text-rose-900"><AlertCircle className="mx-auto h-8 w-8" /><h2 className="mt-3 font-serif text-xl font-semibold">Purchases unavailable</h2><p className="mt-2 text-sm">{error}</p><button type="button" onClick={() => setReloadKey((value) => value + 1)} className="mt-5 rounded-lg bg-rose-900 px-4 py-2 text-sm font-semibold text-white">Try again</button></div> : items.length === 0 ? <EmptyState icon={PackageOpen} title="No paid purchases yet" description="Designs successfully paid for with this account will appear here." actionLabel="Explore designs" onAction={() => window.location.assign('/explore')} /> : <div className="space-y-4">{items.map((purchase) => { const design = purchase.design; const image = normalizeAssetUrl(design.images[0]?.thumbnailUri || design.images[0]?.uri || design.imageUri); return <article key={purchase.id} className="grid gap-5 rounded-2xl border border-stone-200 bg-white p-5 sm:grid-cols-[7rem_1fr_auto] sm:items-center"><div className="aspect-square overflow-hidden rounded-xl bg-stone-100">{image ? <img src={image} alt={design.title} className="h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center text-xs text-stone-400">No preview</div>}</div><div className="min-w-0"><div className="flex flex-wrap items-center gap-2 text-xs"><span className="inline-flex items-center gap-1 font-semibold text-emerald-700"><CheckCircle2 className="h-3.5 w-3.5" />Paid</span><span className="text-stone-300">·</span><span className="font-mono text-stone-500">{purchase.id}</span></div><h2 className="mt-2 truncate font-serif text-xl font-semibold text-stone-950">{design.title}</h2><p className="mt-1 text-xs text-stone-500">{design.categoryName || 'Uncategorized'} · {date(purchase.purchasedAt)}</p><p className="mt-3 text-xs text-stone-500">Protected download actions will be connected in Phase 4.</p></div><div className="flex items-center justify-between gap-4 border-t border-stone-100 pt-4 sm:flex-col sm:items-end sm:border-0 sm:pt-0"><p className="font-mono text-lg font-bold text-stone-950">{money(purchase.amountPaise, purchase.currency)}</p><Link to={`/design/${design.id}`} className="rounded-lg bg-stone-950 px-4 py-2 text-xs font-semibold text-white">View design</Link></div></article>; })}</div>}
+
+        {meta && meta.last_page > 1 && <nav className="mt-8 flex items-center justify-center gap-3" aria-label="Purchase pages"><button type="button" disabled={page <= 1 || loading} onClick={() => setPage((value) => value - 1)} className="rounded-lg border border-stone-300 bg-white px-4 py-2 text-sm font-semibold disabled:opacity-40">Previous</button><span className="text-sm text-stone-500">Page {meta.current_page} of {meta.last_page}</span><button type="button" disabled={page >= meta.last_page || loading} onClick={() => setPage((value) => value + 1)} className="rounded-lg border border-stone-300 bg-white px-4 py-2 text-sm font-semibold disabled:opacity-40">Next</button></nav>}
       </div>
-
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-6">
-        
-        {/* Filters and Search Bar */}
-        <div className="bg-white p-4 rounded-xl border border-stone-200/90 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          {/* Segmented Filter */}
-          <div className="flex bg-stone-100 p-1 rounded-lg text-xs font-semibold">
-            <button
-              onClick={() => setFilterType('all')}
-              className={`px-3 py-1.5 rounded-md transition-colors ${
-                filterType === 'all'
-                  ? 'bg-white text-stone-900 shadow-xs'
-                  : 'text-stone-600 hover:text-stone-900'
-              }`}
-            >
-              All Purchases ({purchases.length})
-            </button>
-            <button
-              onClick={() => setFilterType('design')}
-              className={`px-3 py-1.5 rounded-md transition-colors ${
-                filterType === 'design'
-                  ? 'bg-white text-stone-900 shadow-xs'
-                  : 'text-stone-600 hover:text-stone-900'
-              }`}
-            >
-              Single Designs
-            </button>
-            <button
-              onClick={() => setFilterType('collection')}
-              className={`px-3 py-1.5 rounded-md transition-colors ${
-                filterType === 'collection'
-                  ? 'bg-white text-stone-900 shadow-xs'
-                  : 'text-stone-600 hover:text-stone-900'
-              }`}
-            >
-              Full Collections
-            </button>
-          </div>
-
-          {/* Search Field */}
-          <div className="relative max-w-xs w-full">
-            <Search className="w-4 h-4 text-stone-400 absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search by order ID or title..."
-              className="w-full pl-9 pr-3 py-2 text-xs bg-stone-50 border border-stone-200 rounded-lg text-stone-900 focus:outline-none focus:ring-1 focus:ring-amber-700"
-            />
-          </div>
-        </div>
-
-        {/* Purchases List */}
-        {filteredPurchases.length === 0 ? (
-          <EmptyState
-            icon={PackageOpen}
-            title="No purchases found"
-            description="You have not purchased any machine design files matching your filter criteria."
-            actionLabel="Explore Designs"
-            onAction={() => window.location.href = '/explore'}
-          />
-        ) : (
-          <div className="space-y-4">
-            {filteredPurchases.map((purchase) => (
-              <div
-                key={purchase.id}
-                className="bg-white rounded-xl border border-stone-200/90 p-6 shadow-xs hover:border-stone-300 transition-all flex flex-col md:flex-row gap-6 items-start md:items-center justify-between"
-              >
-                {/* Left: Image & Info */}
-                <div className="flex gap-4 items-start sm:items-center flex-1 min-w-0">
-                  <img
-                    src={purchase.itemImage}
-                    alt={purchase.itemTitle}
-                    className="w-20 h-20 rounded-xl object-cover bg-stone-100 shrink-0 border border-stone-200"
-                  />
-                  <div className="space-y-1 min-w-0 flex-1">
-                    <div className="flex items-center gap-2 text-xs text-stone-500">
-                      <span className="font-mono font-medium text-stone-700">{purchase.orderNumber}</span>
-                      <span>·</span>
-                      <span>{purchase.date}</span>
-                      <span>·</span>
-                      <span className="capitalize text-emerald-700 font-semibold flex items-center gap-1">
-                        <CheckCircle2 className="w-3 h-3" />
-                        Licensed
-                      </span>
-                    </div>
-
-                    <h3 className="font-serif text-base font-bold text-stone-900 truncate">
-                      {purchase.itemTitle}
-                    </h3>
-
-                    <div className="flex items-center gap-2 text-xs text-stone-500">
-                      <span>Category: {purchase.category}</span>
-                      <span>·</span>
-                      <span>Creator: {purchase.sellerName}</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Right: Price & Downloads */}
-                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full md:w-auto pt-4 md:pt-0 border-t md:border-t-0 border-stone-100 justify-between">
-                  <div>
-                    <div className="text-base font-bold font-mono tabular-nums text-stone-900">
-                      ₹{purchase.amountPaid.toLocaleString('en-IN')}
-                    </div>
-                    <span className="text-[11px] text-stone-500">Paid via UPI / Card</span>
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-2">
-                    <button
-                      onClick={() => handleDownload(`${purchase.itemTitle.replace(/\s+/g, '_')}_all_files.zip`)}
-                      className="px-4 py-2 bg-stone-900 hover:bg-stone-800 text-white font-semibold rounded-lg text-xs flex items-center gap-1.5 shadow-xs transition-colors"
-                    >
-                      <Download className="w-3.5 h-3.5" />
-                      Download ZIP
-                    </button>
-                    <Link
-                      to={`/design/${purchase.itemId}`}
-                      className="px-3 py-2 bg-stone-100 hover:bg-stone-200 text-stone-800 font-semibold rounded-lg text-xs transition-colors"
-                    >
-                      Specs
-                    </Link>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-      </div>
-    </div>
+    </main>
   );
 };

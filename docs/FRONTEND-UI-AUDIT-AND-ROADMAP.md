@@ -387,6 +387,15 @@ Implementation status (20 November 2026): complete and runtime-verified.
 
 Exit condition: user session survives refresh and protected actions behave correctly.
 
+Implementation status (20 November 2026): implemented and build-verified.
+
+- Connected registration machine discovery, OTP request, OTP verification and logout to the live authentication contract.
+- Added bearer-token persistence, authenticated request headers, current-user bootstrap after refresh and automatic local sign-out on `401`.
+- Protected routes retain their intended return URL; seller routes now use server permissions and display a clear `403` state instead of a client-side role switch.
+- Connected profile-name updates, machine preferences, saved designs and paginated paid purchases.
+- Save/unsave actions now mutate the server collection, and public catalog requests include the optional token so authenticated machine preferences are honored.
+- Removed the active fake password, role-switching, buyer-purchase and account-settings behavior. Checkout and protected downloads remain intentionally deferred to Phase 4.
+
 ### Phase 4 — Checkout and downloads
 
 - Integrate checkout preview, order creation, Razorpay and verification.

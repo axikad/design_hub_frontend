@@ -24,7 +24,7 @@ export const DesignCard: React.FC<DesignCardProps> = ({ design, viewMode = 'grid
 
   const handleSave = () => {
     if (!user.isLoggedIn) {
-      showToast('Sign in required', 'Saved designs will be connected with account authentication in Phase 3.', 'info');
+      showToast('Sign in required', 'Sign in with your mobile OTP to save this design.', 'info');
       return;
     }
     toggleSaveDesign(design.id);
