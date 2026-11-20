@@ -31,7 +31,7 @@ export const PurchasesPage: React.FC = () => {
   });
 
   const handleDownload = (filename: string) => {
-    showToast('Download Started', `Downloading verified production package: ${filename}`, 'success');
+    showToast('Download Started', `Preparing download: ${filename}`, 'success');
   };
 
   return (

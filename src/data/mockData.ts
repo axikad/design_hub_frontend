@@ -7,11 +7,11 @@ export interface DesignItem {
   id: string;
   title: string;
   description: string;
-  category: 'Saree Borders' | 'Pallu & Dupatta' | 'Blouse & Neckline' | 'All-over Jaal' | 'Lace & Patti' | 'Floral & Motifs' | 'Bridal Lehenga' | 'Kurti Front';
-  machine: 'Multi-head Embroidery' | 'Schiffli' | 'Single Head' | 'Cording / Chain Stitch' | 'Flat Knitting' | 'Ari / Sequence Multi';
-  machineType: 'Industrial Multi-Head' | 'Commercial Schiffli' | 'Single Needle Boutique' | 'High-Speed Flatbed';
+  category: string;
+  machine: string;
+  machineType: string;
   designTypes: string[];
-  formats: ('EMB' | 'DST' | 'PES' | 'JEF' | 'EXP')[];
+  formats: string[];
   price: number;
   sellerId: string;
   sellerName: string;
@@ -24,7 +24,7 @@ export interface DesignItem {
   heightMm: number;
   widthMm: number;
   areaCm2: number;
-  sequenceType: 'Standard 3mm Single' | 'Double Sequence (3mm + 5mm)' | 'None' | 'Reversible Sequin';
+  sequenceType: string;
   images: string[];
   files: { name: string; format: string; size: string }[];
   isFeatured?: boolean;

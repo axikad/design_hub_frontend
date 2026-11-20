@@ -78,7 +78,7 @@ export const SearchByImageModal: React.FC<SearchByImageModalProps> = ({
                 Analyzing embroidery density & needle motifs...
               </p>
               <p className="text-xs text-stone-500">
-                Matching against 2,400+ production EMB files
+                Matching against the current design catalog
               </p>
             </div>
           ) : (

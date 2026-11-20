@@ -1,308 +1,87 @@
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import {
-  FolderPlus,
-  Layers,
-  Search,
-  Eye,
-  Edit2,
-  Trash2,
-  X,
-  UploadCloud,
-  CheckCircle2,
-  Sparkles
-} from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { Archive, Eye, FolderPlus, Search, UploadCloud, X } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
-import { CollectionItem, ASSET_IMAGES } from '../../data/mockData';
+import { ASSET_IMAGES } from '../../data/mockData';
 
 export const MyCollectionsPage: React.FC = () => {
-  const { collections, designs, user, addCollection, showToast } = useApp();
-  const navigate = useNavigate();
+  const { collections, user, addCollection, showToast } = useApp();
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const [name, setName] = useState('');
+  const [price, setPrice] = useState(399);
+  const [archive, setArchive] = useState<File | null>(null);
 
-  const [createModalOpen, setCreateModalOpen] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
-
-  // Create Collection Form State
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [category, setCategory] = useState('Saree Borders');
-  const [price, setPrice] = useState<number>(3999);
-  const [originalTotal, setOriginalTotal] = useState<number>(6500);
-  const [selectedDesignIds, setSelectedDesignIds] = useState<string[]>(['des-101', 'des-103']);
-  const [coverImage, setCoverImage] = useState(ASSET_IMAGES.sareeBorder);
-
-  const myCollections = collections.filter(
-    (c) => c.sellerId === user.id || c.sellerName === user.name
+  const ownFolders = useMemo(
+    () => collections.filter((item) => item.sellerId === user.id || item.sellerName === user.name),
+    [collections, user.id, user.name],
   );
+  const filtered = ownFolders.filter((item) => item.title.toLowerCase().includes(search.trim().toLowerCase()));
 
-  const filteredCollections = myCollections.filter((c) => {
-    if (searchTerm.trim()) {
-      const q = searchTerm.toLowerCase();
-      return c.title.toLowerCase().includes(q) || c.category.toLowerCase().includes(q);
-    }
-    return true;
-  });
-
-  const handleCreateCollection = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!title.trim()) {
-      showToast('Title Required', 'Please provide a collection title.', 'error');
+  const createFolder = (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!name.trim() || !archive) {
+      showToast('Folder details required', 'Enter a folder name and select a ZIP or RAR archive.', 'error');
       return;
     }
-
     addCollection({
-      title,
-      description,
-      category,
+      title: name.trim(),
+      description: `Archive selected: ${archive.name}`,
+      category: 'Design folder',
       price,
-      originalTotal,
-      designCount: selectedDesignIds.length,
-      includedDesignIds: selectedDesignIds,
-      coverImage,
-      isFeatured: true,
+      originalTotal: price,
+      designCount: 0,
+      includedDesignIds: [],
+      coverImage: ASSET_IMAGES.sareeBorder,
     });
-
-    setCreateModalOpen(false);
-    setTitle('');
-    setDescription('');
-  };
-
-  const toggleSelectDesign = (id: string) => {
-    setSelectedDesignIds((prev) =>
-      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
-    );
+    setName('');
+    setPrice(399);
+    setArchive(null);
+    setDialogOpen(false);
   };
 
   return (
-    <div className="min-h-screen bg-[#FAF8F5] pb-24">
-      {/* Create Collection Modal */}
-      {createModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-900/60 backdrop-blur-sm animate-in fade-in duration-150">
-          <div className="bg-white rounded-2xl shadow-2xl border border-stone-200 max-w-xl w-full p-6 animate-in zoom-in-95 duration-150 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between pb-3 border-b border-stone-100">
-              <h3 className="font-serif text-lg font-bold text-stone-900">
-                Create Design Suite / Collection
-              </h3>
-              <button onClick={() => setCreateModalOpen(false)} className="text-stone-400 hover:text-stone-600">
-                <X className="w-5 h-5" />
-              </button>
+    <main className="min-h-screen bg-[#FAF8F5] pb-24">
+      <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+        <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
+          <div><p className="text-xs font-bold uppercase tracking-[0.18em] text-amber-800">Creator studio</p><h1 className="mt-2 font-serif text-4xl font-semibold text-stone-950">Design folders</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-stone-500">Create a purchasable folder from one ZIP or RAR archive. File previews are generated after the archive is processed.</p></div>
+          <button type="button" onClick={() => setDialogOpen(true)} className="inline-flex items-center justify-center gap-2 rounded-xl bg-stone-950 px-5 py-3 text-sm font-semibold text-white hover:bg-amber-900"><FolderPlus className="h-4 w-4" />Add folder</button>
+        </div>
+
+        <div className="mt-8 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950"><strong>UI preview:</strong> archive upload and extracted-file progress will be connected to the folder API in the integration phase.</div>
+
+        <div className="mt-6 flex flex-col justify-between gap-4 rounded-xl border border-stone-200 bg-white p-4 sm:flex-row sm:items-center">
+          <label className="relative block w-full max-w-md"><span className="sr-only">Search folders</span><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-400" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search your folders" className="w-full rounded-lg border border-stone-300 py-2.5 pl-10 pr-3 text-sm outline-none focus:border-amber-700 focus:ring-2 focus:ring-amber-700/20" /></label>
+          <Link to="/studio" className="text-sm font-semibold text-stone-600 hover:text-amber-900">Back to studio</Link>
+        </div>
+
+        {filtered.length > 0 ? (
+          <div className="mt-6 overflow-hidden rounded-2xl border border-stone-200 bg-white">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[680px] text-left text-sm">
+                <thead className="border-b border-stone-200 bg-stone-50 text-xs uppercase tracking-wider text-stone-500"><tr><th className="px-5 py-3">Folder</th><th className="px-5 py-3">Files</th><th className="px-5 py-3">Price</th><th className="px-5 py-3">Created</th><th className="px-5 py-3 text-right">Action</th></tr></thead>
+                <tbody className="divide-y divide-stone-100">{filtered.map((folder) => <tr key={folder.id} className="hover:bg-stone-50/70"><td className="px-5 py-4"><div className="flex items-center gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-lg bg-stone-100 text-amber-800"><Archive className="h-5 w-5" /></span><div><p className="font-semibold text-stone-900">{folder.title}</p><p className="mt-1 max-w-xs truncate text-xs text-stone-400">{folder.description}</p></div></div></td><td className="px-5 py-4 font-mono text-stone-700">{folder.designCount}</td><td className="px-5 py-4 font-mono font-bold text-stone-900">₹{folder.price.toLocaleString('en-IN')}</td><td className="px-5 py-4 text-stone-500">{folder.createdAt}</td><td className="px-5 py-4 text-right"><Link to={`/collections/${folder.id}`} className="inline-flex items-center gap-1.5 text-xs font-semibold text-amber-900 hover:underline"><Eye className="h-3.5 w-3.5" />Preview</Link></td></tr>)}</tbody>
+              </table>
             </div>
+          </div>
+        ) : (
+          <div className="mt-6 rounded-2xl border border-dashed border-stone-300 bg-white p-12 text-center"><Archive className="mx-auto h-8 w-8 text-stone-300" /><h2 className="mt-4 font-serif text-xl font-semibold text-stone-900">No folders found</h2><p className="mt-2 text-sm text-stone-500">Create a folder or change your search.</p></div>
+        )}
+      </div>
 
-            <form onSubmit={handleCreateCollection} className="mt-4 space-y-4 text-xs">
-              <div className="space-y-1">
-                <label className="font-semibold text-stone-700 block">Collection Title *</label>
-                <input
-                  type="text"
-                  required
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder="e.g. Surat Heritage Bridal Saree Border Suite"
-                  className="w-full p-2.5 bg-stone-50 border border-stone-300 rounded-lg text-stone-900 focus:outline-none focus:ring-1 focus:ring-amber-700"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="font-semibold text-stone-700 block">Description & Included Components</label>
-                <textarea
-                  rows={3}
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Explain how the border, pallu, and blouse motifs coordinate..."
-                  className="w-full p-2.5 bg-stone-50 border border-stone-300 rounded-lg text-stone-900 focus:outline-none focus:ring-1 focus:ring-amber-700"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="font-semibold text-stone-700 block">Bundle Price (₹ INR)</label>
-                  <input
-                    type="number"
-                    value={price}
-                    onChange={(e) => setPrice(Number(e.target.value))}
-                    className="w-full p-2.5 bg-stone-50 border border-stone-300 rounded-lg font-mono text-stone-900"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="font-semibold text-stone-700 block">Individual Total (₹ INR)</label>
-                  <input
-                    type="number"
-                    value={originalTotal}
-                    onChange={(e) => setOriginalTotal(Number(e.target.value))}
-                    className="w-full p-2.5 bg-stone-50 border border-stone-300 rounded-lg font-mono text-stone-900"
-                  />
-                </div>
-              </div>
-
-              {/* Design Selector */}
-              <div className="space-y-2 pt-2 border-t border-stone-100">
-                <label className="font-semibold text-stone-700 block">
-                  Select Included Designs ({selectedDesignIds.length} Selected)
-                </label>
-                <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
-                  {designs.slice(0, 6).map((d) => {
-                    const isSelected = selectedDesignIds.includes(d.id);
-                    return (
-                      <button
-                        key={d.id}
-                        type="button"
-                        onClick={() => toggleSelectDesign(d.id)}
-                        className={`w-full p-2 rounded-lg border text-left flex items-center justify-between gap-3 ${
-                          isSelected
-                            ? 'bg-amber-50 border-amber-300 text-stone-900 font-semibold'
-                            : 'bg-stone-50 border-stone-200 text-stone-600'
-                        }`}
-                      >
-                        <div className="flex items-center gap-2 truncate">
-                          <img src={d.images[0]} alt={d.title} className="w-8 h-8 rounded object-cover" />
-                          <span className="truncate">{d.title}</span>
-                        </div>
-                        <span className="font-mono text-[11px] shrink-0">₹{d.price}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div className="pt-4 border-t border-stone-100 flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setCreateModalOpen(false)}
-                  className="px-4 py-2 text-stone-600 hover:bg-stone-100 rounded-lg font-semibold"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 bg-stone-900 hover:bg-stone-800 text-white rounded-lg font-semibold"
-                >
-                  Create & Publish Suite
-                </button>
-              </div>
+      {dialogOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/60 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="create-folder-title" onMouseDown={(event) => { if (event.currentTarget === event.target) setDialogOpen(false); }}>
+          <div className="w-full max-w-lg rounded-2xl border border-stone-200 bg-white p-6 shadow-2xl">
+            <div className="flex items-center justify-between"><div><p className="text-xs font-bold uppercase tracking-wider text-amber-800">Design folder</p><h2 id="create-folder-title" className="mt-1 font-serif text-2xl font-semibold text-stone-950">Add folder</h2></div><button type="button" onClick={() => setDialogOpen(false)} className="rounded-lg p-2 text-stone-500 hover:bg-stone-100" aria-label="Close"><X className="h-5 w-5" /></button></div>
+            <form onSubmit={createFolder} className="mt-6 space-y-5">
+              <label className="block"><span className="text-sm font-semibold text-stone-700">Folder name</span><input value={name} onChange={(event) => setName(event.target.value)} required className="mt-2 w-full rounded-xl border border-stone-300 px-4 py-3 text-sm outline-none focus:border-amber-700 focus:ring-2 focus:ring-amber-700/20" /></label>
+              <label className="block"><span className="text-sm font-semibold text-stone-700">Price (INR)</span><input type="number" min="0" step="1" value={price} onChange={(event) => setPrice(Number(event.target.value))} required className="mt-2 w-full rounded-xl border border-stone-300 px-4 py-3 font-mono text-sm outline-none focus:border-amber-700 focus:ring-2 focus:ring-amber-700/20" /></label>
+              <label className="block rounded-xl border border-dashed border-stone-300 bg-stone-50 p-5 text-center hover:border-amber-500"><UploadCloud className="mx-auto h-7 w-7 text-amber-800" /><span className="mt-2 block text-sm font-semibold text-stone-800">Select ZIP or RAR archive</span><span className="mt-1 block text-xs text-stone-500">{archive?.name || 'No archive selected'}</span><input type="file" accept=".zip,.rar,application/zip,application/vnd.rar" onChange={(event) => setArchive(event.target.files?.[0] || null)} className="sr-only" /></label>
+              <div className="flex justify-end gap-3 border-t border-stone-100 pt-5"><button type="button" onClick={() => setDialogOpen(false)} className="rounded-lg px-4 py-2.5 text-sm font-semibold text-stone-600 hover:bg-stone-100">Cancel</button><button type="submit" className="rounded-lg bg-stone-950 px-5 py-2.5 text-sm font-semibold text-white hover:bg-amber-900">Create folder</button></div>
             </form>
           </div>
         </div>
       )}
-
-      {/* Header */}
-      <div className="bg-white border-b border-stone-200 py-8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-amber-900 mb-1">
-                <span>Bundle Architecture</span>
-                <span aria-hidden="true">·</span>
-                <span>{myCollections.length} Coordinated Suites</span>
-              </div>
-              <h1 className="font-serif text-2xl sm:text-3xl font-bold text-stone-900">
-                My Design Collections & Bundles
-              </h1>
-            </div>
-
-            <button
-              onClick={() => setCreateModalOpen(true)}
-              className="px-4 py-2.5 bg-stone-900 hover:bg-stone-800 text-white font-semibold rounded-xl text-xs flex items-center gap-1.5 shadow-sm transition-colors self-start sm:self-auto"
-            >
-              <FolderPlus className="w-4 h-4" />
-              Create New Collection
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-6">
-        
-        {/* Studio Sub-nav */}
-        <div className="bg-white p-2 rounded-xl border border-stone-200/90 flex items-center gap-2 text-xs font-semibold">
-          <Link to="/studio" className="px-4 py-2 rounded-lg text-stone-600 hover:bg-stone-100">
-            Dashboard
-          </Link>
-          <Link to="/studio/designs" className="px-4 py-2 rounded-lg text-stone-600 hover:bg-stone-100">
-            My Designs
-          </Link>
-          <Link to="/studio/collections" className="px-4 py-2 rounded-lg bg-stone-900 text-white">
-            Collections ({myCollections.length})
-          </Link>
-          <Link to="/studio/wallet" className="px-4 py-2 rounded-lg text-stone-600 hover:bg-stone-100">
-            Wallet & Ledger
-          </Link>
-        </div>
-
-        {/* Collections Table */}
-        <div className="bg-white rounded-2xl border border-stone-200/90 overflow-hidden shadow-xs">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-stone-50 border-b border-stone-200 text-stone-500 uppercase tracking-wider font-semibold">
-                <tr>
-                  <th className="py-3 px-4">Suite / Collection</th>
-                  <th className="py-3 px-4">Designs Included</th>
-                  <th className="py-3 px-4">Bundle Price</th>
-                  <th className="py-3 px-4">Est. Net (85%)</th>
-                  <th className="py-3 px-4">Sales Count</th>
-                  <th className="py-3 px-4 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-stone-100">
-                {filteredCollections.map((col) => {
-                  const estimatedNet = col.price * 0.85;
-                  return (
-                    <tr key={col.id} className="hover:bg-stone-50/50">
-                      <td className="py-3.5 px-4">
-                        <div className="flex items-center gap-3">
-                          <img
-                            src={col.coverImage}
-                            alt={col.title}
-                            className="w-14 h-10 rounded-lg object-cover border border-stone-200"
-                          />
-                          <div className="min-w-0 max-w-sm">
-                            <h4 className="font-serif text-xs font-bold text-stone-900 truncate">
-                              {col.title}
-                            </h4>
-                            <span className="text-[10px] text-stone-400 font-mono">
-                              {col.category} · Created {col.createdAt}
-                            </span>
-                          </div>
-                        </div>
-                      </td>
-
-                      <td className="py-3.5 px-4 font-mono font-medium text-stone-800">
-                        {col.designCount} machine files
-                      </td>
-
-                      <td className="py-3.5 px-4">
-                        <span className="font-bold font-mono text-stone-900">
-                          ₹{col.price.toLocaleString('en-IN')}
-                        </span>
-                        <span className="text-[10px] line-through text-stone-400 font-mono block">
-                          ₹{col.originalTotal.toLocaleString('en-IN')}
-                        </span>
-                      </td>
-
-                      <td className="py-3.5 px-4 font-mono font-bold text-emerald-800">
-                        ₹{estimatedNet.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
-                      </td>
-
-                      <td className="py-3.5 px-4 font-mono text-stone-900 font-semibold">
-                        {col.salesCount} bundles
-                      </td>
-
-                      <td className="py-3.5 px-4 text-right">
-                        <Link
-                          to={`/collections/${col.id}`}
-                          className="p-1.5 text-stone-500 hover:text-stone-900 inline-flex items-center gap-1 text-[11px] font-semibold"
-                        >
-                          <Eye className="w-3.5 h-3.5" />
-                          Preview
-                        </Link>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-      </div>
-    </div>
+    </main>
   );
 };

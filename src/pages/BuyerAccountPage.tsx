@@ -41,9 +41,6 @@ export const BuyerAccountPage: React.FC = () => {
   const [name, setName] = useState(user.name);
   const [email, setEmail] = useState(user.email);
   const [phone, setPhone] = useState(user.phone);
-  const [companyName, setCompanyName] = useState(user.companyName);
-  const [gstNumber, setGstNumber] = useState(user.gstNumber);
-  const [location, setLocation] = useState(user.location);
   const [machinePrefs, setMachinePrefs] = useState<string[]>(user.machinePreferences);
 
   // Delete modal
@@ -57,9 +54,6 @@ export const BuyerAccountPage: React.FC = () => {
       name,
       email,
       phone,
-      companyName,
-      gstNumber,
-      location,
       machinePreferences: machinePrefs,
     });
   };
@@ -104,7 +98,7 @@ export const BuyerAccountPage: React.FC = () => {
                 </span>
               </div>
               <p className="text-xs text-stone-500 mt-0.5">
-                {user.email} · {user.location}
+                {user.email || `${user.countryCode} ${user.phone}`}
               </p>
             </div>
           </div>
@@ -234,35 +228,8 @@ export const BuyerAccountPage: React.FC = () => {
                     />
                   </div>
 
-                  <div className="space-y-1.5">
-                    <label className="font-semibold text-stone-700 block">City / Production Hub</label>
-                    <input
-                      type="text"
-                      value={location}
-                      onChange={(e) => setLocation(e.target.value)}
-                      placeholder="e.g. Surat, Gujarat"
-                      className="w-full p-2.5 bg-stone-50 border border-stone-300 rounded-lg text-stone-900 focus:outline-none focus:ring-1 focus:ring-amber-700"
-                    />
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className="font-semibold text-stone-700 block">Company / Studio Entity</label>
-                    <input
-                      type="text"
-                      value={companyName}
-                      onChange={(e) => setCompanyName(e.target.value)}
-                      className="w-full p-2.5 bg-stone-50 border border-stone-300 rounded-lg text-stone-900 focus:outline-none focus:ring-1 focus:ring-amber-700"
-                    />
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className="font-semibold text-stone-700 block">GSTIN (For Tax Invoices)</label>
-                    <input
-                      type="text"
-                      value={gstNumber}
-                      onChange={(e) => setGstNumber(e.target.value)}
-                      className="w-full p-2.5 bg-stone-50 border border-stone-300 rounded-lg text-stone-900 font-mono focus:outline-none focus:ring-1 focus:ring-amber-700 uppercase"
-                    />
+                  <div className="rounded-xl border border-stone-200 bg-stone-50 p-4 text-xs leading-5 text-stone-500 sm:col-span-2">
+                    Business, tax and public studio-profile fields will appear only after their backend contracts and policies are approved.
                   </div>
                 </div>
 

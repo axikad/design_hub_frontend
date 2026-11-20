@@ -262,7 +262,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       sellerRating: 5.0,
       salesCount: 0,
       createdAt: new Date().toISOString().split('T')[0],
-      buyerProtection: 'Production guaranteed on multi-head and single needle machinery.',
+      buyerProtection: 'File details and access terms will be supplied by the server.',
     };
 
     setDesigns((prev) => [newDesign, ...prev]);

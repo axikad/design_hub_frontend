@@ -4,7 +4,6 @@ import {
   Heart,
   Share2,
   Download,
-  ShieldCheck,
   CheckCircle2,
   FileCheck,
   Maximize2,
@@ -47,7 +46,7 @@ export const DesignDetailsPage: React.FC = () => {
   };
 
   const handleDownloadFile = (fileName: string) => {
-    showToast('Download Started', `Packaging verified production file: ${fileName}`, 'success');
+    showToast('Download Started', `Preparing file: ${fileName}`, 'success');
   };
 
   return (
@@ -155,7 +154,7 @@ export const DesignDetailsPage: React.FC = () => {
             {/* Technical Specifications Matrix */}
             <div className="mt-8 bg-white rounded-2xl border border-stone-200/90 p-6 space-y-6">
               <h3 className="font-serif text-lg font-bold text-stone-900 border-b border-stone-100 pb-3">
-                Machine Calibration & Needle Specifications
+                Design specifications
               </h3>
 
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-xs">
@@ -205,7 +204,7 @@ export const DesignDetailsPage: React.FC = () => {
               {/* Techniques / Design types */}
               <div>
                 <span className="text-xs font-semibold text-stone-700 block mb-2">
-                  Applied Techniques & Thread Formulas:
+                  Design types
                 </span>
                 <div className="flex flex-wrap gap-2 text-xs">
                   {design.designTypes.map((type) => (
@@ -229,16 +228,6 @@ export const DesignDetailsPage: React.FC = () => {
                 </p>
               </div>
 
-              {/* Production Guarantee Callout */}
-              <div className="p-4 bg-emerald-50/60 border border-emerald-200/70 rounded-xl flex items-start gap-3 text-xs">
-                <ShieldCheck className="w-5 h-5 text-emerald-800 shrink-0 mt-0.5" />
-                <div>
-                  <h5 className="font-semibold text-emerald-950">Factory Production Guarantee</h5>
-                  <p className="text-emerald-900/80 mt-0.5 leading-relaxed">
-                    {design.buyerProtection}
-                  </p>
-                </div>
-              </div>
             </div>
 
             {/* Included Production Files List */}
@@ -359,7 +348,7 @@ export const DesignDetailsPage: React.FC = () => {
                       to="/account/purchases"
                       className="block text-center text-xs text-stone-600 hover:text-stone-900 font-medium"
                     >
-                      View in My Purchases & Invoices
+                      View in my purchases
                     </Link>
                   </div>
                 ) : (
@@ -373,32 +362,20 @@ export const DesignDetailsPage: React.FC = () => {
                 )}
 
                 <p className="text-[11px] text-stone-400 text-center">
-                  Instant ZIP download upon payment · GST Invoice provided
+                  Eligible files become available after payment confirmation.
                 </p>
               </div>
 
               {/* Machine Compatibility Pills / Format Checklist */}
               <div className="pt-4 border-t border-stone-100 space-y-2 text-xs">
-                <span className="font-semibold text-stone-800 block">
-                  Included Machine Formats:
-                </span>
-                <div className="grid grid-cols-2 gap-2 text-stone-600">
-                  <div className="flex items-center gap-1.5">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-700" />
-                    <span>.EMB (Wilcom Master)</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-700" />
-                    <span>.DST (Tajima / Barudan)</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-700" />
-                    <span>.PES (Brother / Baby Lock)</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-700" />
-                    <span>.EXP (Melco / Bernina)</span>
-                  </div>
+                  <span className="font-semibold text-stone-800 block">Available formats</span>
+                <div className="flex flex-wrap gap-2 text-stone-600">
+                  {design.formats.map((format) => (
+                    <span key={format} className="inline-flex items-center gap-1.5 rounded-lg border border-stone-200 bg-stone-50 px-2.5 py-1.5">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-700" />
+                      {format}
+                    </span>
+                  ))}
                 </div>
               </div>
 

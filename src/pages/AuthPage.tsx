@@ -147,7 +147,7 @@ export const AuthPage: React.FC = () => {
               : 'Sign in to Textile Design Hub'}
           </h1>
           <p className="text-xs text-stone-500">
-            Access verified machine embroidery designs & creator royalties
+            Browse textile designs and manage your marketplace activity
           </p>
         </div>
 

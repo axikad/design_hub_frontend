@@ -174,7 +174,7 @@ export const MyDesignsPage: React.FC = () => {
             title={myDesigns.length === 0 ? 'Welcome to your Creator Studio' : 'No designs matching your filter'}
             description={
               myDesigns.length === 0
-                ? 'Upload your first Wilcom EMB or Tajima DST machine punch to start generating royalties from garment manufacturers.'
+                ? 'Add your first textile design and its available machine files.'
                 : 'Try clearing your search query or switching status filters.'
             }
             actionLabel="Upload First Design"
@@ -189,15 +189,13 @@ export const MyDesignsPage: React.FC = () => {
                     <th className="py-3 px-4">Design Item</th>
                     <th className="py-3 px-4">Category & Machine</th>
                     <th className="py-3 px-4">Specifications</th>
-                    <th className="py-3 px-4">Price / Est. Net</th>
-                    <th className="py-3 px-4">Sales / Runs</th>
+                    <th className="py-3 px-4">Price</th>
                     <th className="py-3 px-4">Status</th>
                     <th className="py-3 px-4 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-stone-100">
                   {filteredDesigns.map((design) => {
-                    const estimatedNet = design.price * 0.85;
                     return (
                       <tr key={design.id} className="hover:bg-stone-50/50 transition-colors">
                         <td className="py-3.5 px-4">
@@ -232,16 +230,6 @@ export const MyDesignsPage: React.FC = () => {
                           <div className="font-bold font-mono tabular-nums text-stone-900">
                             ₹{design.price.toLocaleString('en-IN')}
                           </div>
-                          <div className="text-[10px] font-mono text-emerald-700">
-                            ~₹{estimatedNet.toLocaleString('en-IN', { maximumFractionDigits: 0 })} net
-                          </div>
-                        </td>
-
-                        <td className="py-3.5 px-4">
-                          <span className="font-bold font-mono text-stone-900">
-                            {design.salesCount}
-                          </span>
-                          <span className="text-[11px] text-stone-400 block">purchases</span>
                         </td>
 
                         <td className="py-3.5 px-4">

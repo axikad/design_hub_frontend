@@ -56,9 +56,6 @@ export const AddEditDesignPage: React.FC = () => {
 
   // Step 4: Pricing
   const [price, setPrice] = useState<number>(existingDesign?.price || 1499);
-  const commissionRate = 0.15; // 15%
-  const commissionAmount = price * commissionRate;
-  const estimatedNet = price - commissionAmount;
 
   // Step 5: Files
   const [images, setImages] = useState<string[]>(
@@ -100,7 +97,7 @@ export const AddEditDesignPage: React.FC = () => {
     setTimeout(() => {
       setUploadProgress(100);
       setIsSimulatingUpload(false);
-      showToast('Files Validated', 'All Wilcom EMB and Tajima DST punches passed stitch checks.', 'success');
+      showToast('Files selected', 'The selected files are ready for the API upload step.', 'success');
     }, 700);
   };
 
@@ -133,7 +130,7 @@ export const AddEditDesignPage: React.FC = () => {
         { name: `${title.replace(/\s+/g, '_')}.DST`, format: 'DST', size: '2.1 MB' },
         { name: `${title.replace(/\s+/g, '_')}.PES`, format: 'PES', size: '2.4 MB' },
       ],
-      buyerProtection: 'Production guaranteed on multi-head and single needle machinery.',
+      buyerProtection: 'File details and access terms will be supplied by the server.',
     };
 
     if (isEdit && existingDesign) {
@@ -520,7 +517,7 @@ export const AddEditDesignPage: React.FC = () => {
                   Step 4: Pricing & Royalties
                 </h3>
                 <p className="text-xs text-stone-500">
-                  Set your base price in Indian Rupees. We take a flat 15% platform infrastructure fee.
+                  Set the listing price in Indian Rupees. The server pricing preview will provide the current commission and estimated earning.
                 </p>
               </div>
 
@@ -555,29 +552,14 @@ export const AddEditDesignPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Commission Calculator Matrix */}
-              <div className="p-5 bg-stone-50 rounded-xl border border-stone-200 space-y-3 text-xs">
-                <h4 className="font-semibold text-stone-800">
-                  Estimated Earning Breakdown per Purchase:
-                </h4>
-                <div className="space-y-2">
-                  <div className="flex justify-between text-stone-600">
-                    <span>Gross Selling Price</span>
-                    <span className="font-mono tabular-nums">₹{price.toLocaleString('en-IN')}</span>
-                  </div>
-                  <div className="flex justify-between text-stone-500">
-                    <span>Platform Commission (15%)</span>
-                    <span className="font-mono tabular-nums">-₹{commissionAmount.toFixed(2)}</span>
-                  </div>
-                  <div className="pt-2 border-t border-stone-200 flex justify-between font-bold text-sm text-stone-900">
-                    <span>Estimated Seller Net Payout</span>
-                    <span className="font-mono text-emerald-800 text-base">
-                      ₹{estimatedNet.toFixed(2)}
-                    </span>
-                  </div>
+              <div className="p-5 bg-stone-50 rounded-xl border border-stone-200 text-xs">
+                <h4 className="font-semibold text-stone-800">Seller pricing preview</h4>
+                <div className="mt-3 flex justify-between text-stone-600">
+                  <span>Listing price</span>
+                  <span className="font-mono tabular-nums">₹{price.toLocaleString('en-IN')}</span>
                 </div>
-                <p className="text-[11px] text-stone-400 pt-1">
-                  * Note: This estimate reflects net payout per single transaction before any applicable GST reverse charges.
+                <p className="mt-3 border-t border-stone-200 pt-3 text-[11px] leading-5 text-stone-500">
+                  Commission and estimated seller earnings will be supplied by the seller pricing service. The browser must not calculate them.
                 </p>
               </div>
             </div>
@@ -661,7 +643,7 @@ export const AddEditDesignPage: React.FC = () => {
                 </div>
                 <div>
                   <p className="text-xs font-semibold text-stone-900">
-                    Drop Wilcom (.EMB) or Tajima (.DST) stitch files here
+                    Select the available stitch or machine files for this design
                   </p>
                   <p className="text-[11px] text-stone-500">
                     Automatic needle jump & color stop validation
@@ -726,8 +708,8 @@ export const AddEditDesignPage: React.FC = () => {
                     <span className="font-mono font-bold text-stone-900">{heightMm}×{widthMm} mm</span>
                   </div>
                   <div>
-                    <span className="text-stone-400 block text-[10px] uppercase">Price / Est. Net</span>
-                    <span className="font-mono font-bold text-stone-900">₹{price} / ₹{estimatedNet.toFixed(0)}</span>
+                    <span className="text-stone-400 block text-[10px] uppercase">Listing price</span>
+                    <span className="font-mono font-bold text-stone-900">₹{price}</span>
                   </div>
                 </div>
               </div>
@@ -739,7 +721,7 @@ export const AddEditDesignPage: React.FC = () => {
                   className="flex-1 py-3 px-4 bg-stone-900 hover:bg-stone-800 text-white font-semibold rounded-xl text-xs flex items-center justify-center gap-2 shadow-sm transition-colors"
                 >
                   <UploadCloud className="w-4 h-4" />
-                  Publish Live to Marketplace
+                  Save marketplace design
                 </button>
                 <button
                   type="button"

@@ -67,8 +67,6 @@ export const CollectionDetailPage: React.FC = () => {
               <span className="uppercase font-semibold tracking-wider text-amber-900">{collection.category}</span>
               <span>·</span>
               <span>By {collection.sellerName}</span>
-              <span>·</span>
-              <span className="text-emerald-700 font-semibold">{collection.salesCount} suites sold</span>
             </div>
 
             <h1 className="font-serif text-2xl sm:text-3xl font-bold text-stone-900 leading-tight">

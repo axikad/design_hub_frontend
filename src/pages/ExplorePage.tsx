@@ -33,8 +33,8 @@ export const ExplorePage: React.FC = () => {
   // Local state
   const [localSearch, setLocalSearch] = useState(searchParams.get('q') || searchQuery || '');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-  const [sortBy, setSortBy] = useState<'popular' | 'newest' | 'price-asc' | 'price-desc'>(
-    (searchParams.get('sort') as any) || 'popular'
+  const [sortBy, setSortBy] = useState<'newest' | 'price-asc' | 'price-desc'>(
+    (searchParams.get('sort') as any) || 'newest'
   );
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
   const [imageModalOpen, setImageModalOpen] = useState(false);
@@ -142,9 +142,8 @@ export const ExplorePage: React.FC = () => {
         return result.sort((a, b) => a.price - b.price);
       case 'price-desc':
         return result.sort((a, b) => b.price - a.price);
-      case 'popular':
       default:
-        return result.sort((a, b) => b.salesCount - a.salesCount);
+        return result;
     }
   }, [filteredDesigns, sortBy]);
 
@@ -210,7 +209,7 @@ export const ExplorePage: React.FC = () => {
               <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-amber-900 mb-1">
                 <span>Direct Production Exchange</span>
                 <span aria-hidden="true">·</span>
-                <span>{designs.length} Verified Masterworks</span>
+                <span>{designs.length} catalog designs</span>
               </div>
               <h1 className="font-serif text-2xl sm:text-3xl font-bold text-stone-900">
                 Explore Machine Embroidery Designs
@@ -426,7 +425,7 @@ export const ExplorePage: React.FC = () => {
                     Filters {activeFilterCount > 0 ? `(${activeFilterCount})` : ''}
                   </button>
                   <p className="text-xs text-stone-600 font-medium">
-                    Showing <span className="font-bold text-stone-900">{sortedDesigns.length}</span> verified design files
+                    Showing <span className="font-bold text-stone-900">{sortedDesigns.length}</span> design files
                   </p>
                 </div>
 
@@ -439,7 +438,6 @@ export const ExplorePage: React.FC = () => {
                       onChange={(e) => setSortBy(e.target.value as any)}
                       className="text-xs bg-stone-50 border border-stone-200 rounded-lg py-1.5 px-2.5 text-stone-800 font-medium focus:outline-none focus:ring-1 focus:ring-amber-700"
                     >
-                      <option value="popular">Most Popular / High Volume</option>
                       <option value="newest">Newest Releases</option>
                       <option value="price-asc">Price: Low to High</option>
                       <option value="price-desc">Price: High to Low</option>

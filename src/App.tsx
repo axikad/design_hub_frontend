@@ -3,40 +3,39 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useEffect } from 'react';
-import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
-import { AppProvider } from './context/AppContext';
+import React, { Suspense, lazy, useEffect } from 'react';
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { AppProvider, useApp } from './context/AppContext';
 import { Header } from './components/layout/Header';
 import { Footer } from './components/layout/Footer';
 import { MobileBottomNav } from './components/layout/MobileBottomNav';
 import { ToastContainer } from './components/common/ToastContainer';
 
-// Pages
-import { HomePage } from './pages/HomePage';
-import { ExplorePage } from './pages/ExplorePage';
-import { DesignDetailsPage } from './pages/DesignDetailsPage';
-import { CollectionsPage } from './pages/CollectionsPage';
-import { CollectionDetailPage } from './pages/CollectionDetailPage';
-import { CheckoutPage } from './pages/CheckoutPage';
-import { AuthPage } from './pages/AuthPage';
-import { BuyerAccountPage } from './pages/BuyerAccountPage';
-import { PurchasesPage } from './pages/PurchasesPage';
-import { StudioDashboardPage } from './pages/studio/StudioDashboardPage';
-import { MyDesignsPage } from './pages/studio/MyDesignsPage';
-import { AddEditDesignPage } from './pages/studio/AddEditDesignPage';
-import { MyCollectionsPage } from './pages/studio/MyCollectionsPage';
-import { SellerWalletPage } from './pages/studio/SellerWalletPage';
-import { CreatorProfilePage } from './pages/CreatorProfilePage';
-import { SettingsPage } from './pages/SettingsPage';
-import {
-  AboutPage,
-  TermsPage,
-  PrivacyPage,
-  RefundPage,
-  HelpCenterPage,
-  ContactPage,
-  NotFoundPage,
-} from './pages/legal/LegalPages';
+const page = <T extends Record<string, React.ComponentType>>(load: () => Promise<T>, name: keyof T) =>
+  lazy(async () => ({ default: (await load())[name] }));
+
+const HomePage = page(() => import('./pages/HomePage'), 'HomePage');
+const ExplorePage = page(() => import('./pages/ExplorePage'), 'ExplorePage');
+const DesignDetailsPage = page(() => import('./pages/DesignDetailsPage'), 'DesignDetailsPage');
+const CollectionsPage = page(() => import('./pages/CollectionsPage'), 'CollectionsPage');
+const CollectionDetailPage = page(() => import('./pages/CollectionDetailPage'), 'CollectionDetailPage');
+const CheckoutPage = page(() => import('./pages/CheckoutPage'), 'CheckoutPage');
+const AuthPage = page(() => import('./pages/AuthPage'), 'AuthPage');
+const BuyerAccountPage = page(() => import('./pages/BuyerAccountPage'), 'BuyerAccountPage');
+const PurchasesPage = page(() => import('./pages/PurchasesPage'), 'PurchasesPage');
+const StudioDashboardPage = page(() => import('./pages/studio/StudioDashboardPage'), 'StudioDashboardPage');
+const MyDesignsPage = page(() => import('./pages/studio/MyDesignsPage'), 'MyDesignsPage');
+const AddEditDesignPage = page(() => import('./pages/studio/AddEditDesignPage'), 'AddEditDesignPage');
+const MyCollectionsPage = page(() => import('./pages/studio/MyCollectionsPage'), 'MyCollectionsPage');
+const SellerWalletPage = page(() => import('./pages/studio/SellerWalletPage'), 'SellerWalletPage');
+const SettingsPage = page(() => import('./pages/SettingsPage'), 'SettingsPage');
+const AboutPage = page(() => import('./pages/legal/LegalPages'), 'AboutPage');
+const TermsPage = page(() => import('./pages/legal/LegalPages'), 'TermsPage');
+const PrivacyPage = page(() => import('./pages/legal/LegalPages'), 'PrivacyPage');
+const RefundPage = page(() => import('./pages/legal/LegalPages'), 'RefundPage');
+const HelpCenterPage = page(() => import('./pages/legal/LegalPages'), 'HelpCenterPage');
+const ContactPage = page(() => import('./pages/legal/LegalPages'), 'ContactPage');
+const NotFoundPage = page(() => import('./pages/legal/LegalPages'), 'NotFoundPage');
 
 // Scroll to top on route navigation
 const ScrollToTop = () => {
@@ -47,6 +46,20 @@ const ScrollToTop = () => {
   return null;
 };
 
+const PageLoading = () => (
+  <div className="mx-auto flex min-h-[50vh] max-w-7xl items-center justify-center px-4" role="status" aria-live="polite">
+    <div className="flex items-center gap-3 text-sm text-stone-500"><span className="h-5 w-5 animate-spin rounded-full border-2 border-stone-300 border-t-amber-800" />Loading page…</div>
+  </div>
+);
+
+const RequireAccount: React.FC<{ children: React.ReactNode; seller?: boolean }> = ({ children, seller = false }) => {
+  const { user } = useApp();
+  const location = useLocation();
+  if (!user.isLoggedIn) return <Navigate to="/auth" replace state={{ returnTo: `${location.pathname}${location.search}` }} />;
+  if (seller && user.role !== 'seller') return <Navigate to="/account" replace state={{ accessMessage: 'Seller access is required for that page.' }} />;
+  return <>{children}</>;
+};
+
 export default function App() {
   return (
     <AppProvider>
@@ -54,7 +67,11 @@ export default function App() {
         <ScrollToTop />
         <div className="flex flex-col min-h-screen text-stone-900 bg-[#FAF8F5]">
           <Header />
+          <div className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-center text-[11px] font-medium text-amber-950">
+            Prototype preview — marketplace data and actions are simulated until API integration is complete.
+          </div>
           <div className="flex-1">
+            <Suspense fallback={<PageLoading />}>
             <Routes>
               {/* Public Discovery Routes */}
               <Route path="/" element={<HomePage />} />
@@ -62,28 +79,28 @@ export default function App() {
               <Route path="/design/:id" element={<DesignDetailsPage />} />
               <Route path="/collections" element={<CollectionsPage />} />
               <Route path="/collections/:id" element={<CollectionDetailPage />} />
-              <Route path="/creator/:id" element={<CreatorProfilePage />} />
+              <Route path="/creator/:id" element={<Navigate to="/explore" replace />} />
 
               {/* Checkout & Commerce */}
-              <Route path="/checkout/:type/:id" element={<CheckoutPage />} />
+              <Route path="/checkout/:type/:id" element={<RequireAccount><CheckoutPage /></RequireAccount>} />
 
               {/* Authentication */}
               <Route path="/auth" element={<AuthPage />} />
 
               {/* Buyer Account */}
-              <Route path="/account" element={<BuyerAccountPage />} />
-              <Route path="/account/purchases" element={<PurchasesPage />} />
+              <Route path="/account" element={<RequireAccount><BuyerAccountPage /></RequireAccount>} />
+              <Route path="/account/purchases" element={<RequireAccount><PurchasesPage /></RequireAccount>} />
 
               {/* Seller Studio */}
-              <Route path="/studio" element={<StudioDashboardPage />} />
-              <Route path="/studio/designs" element={<MyDesignsPage />} />
-              <Route path="/studio/designs/new" element={<AddEditDesignPage />} />
-              <Route path="/studio/designs/edit/:id" element={<AddEditDesignPage />} />
-              <Route path="/studio/collections" element={<MyCollectionsPage />} />
-              <Route path="/studio/wallet" element={<SellerWalletPage />} />
+              <Route path="/studio" element={<RequireAccount seller><StudioDashboardPage /></RequireAccount>} />
+              <Route path="/studio/designs" element={<RequireAccount seller><MyDesignsPage /></RequireAccount>} />
+              <Route path="/studio/designs/new" element={<RequireAccount seller><AddEditDesignPage /></RequireAccount>} />
+              <Route path="/studio/designs/edit/:id" element={<RequireAccount seller><AddEditDesignPage /></RequireAccount>} />
+              <Route path="/studio/collections" element={<RequireAccount seller><MyCollectionsPage /></RequireAccount>} />
+              <Route path="/studio/wallet" element={<RequireAccount seller><SellerWalletPage /></RequireAccount>} />
 
               {/* Settings, Legal & Support */}
-              <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/settings" element={<RequireAccount><SettingsPage /></RequireAccount>} />
               <Route path="/about" element={<AboutPage />} />
               <Route path="/terms" element={<TermsPage />} />
               <Route path="/privacy" element={<PrivacyPage />} />
@@ -94,6 +111,7 @@ export default function App() {
               {/* 404 Fallback */}
               <Route path="*" element={<NotFoundPage />} />
             </Routes>
+            </Suspense>
           </div>
           <Footer />
           <MobileBottomNav />

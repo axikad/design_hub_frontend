@@ -146,14 +146,14 @@ export const SettingsPage: React.FC = () => {
                 >
                   <span className="font-bold block">Automatic Bank Transfer</span>
                   <p className="text-[11px] text-stone-500 mt-1">
-                    Funds are automatically transferred on each bi-weekly settlement date.
+                    Eligible test earnings follow the settlement schedule returned by the server. Live bank transfer is not enabled yet.
                   </p>
                 </button>
               </div>
 
               <div className="space-y-1 pt-2">
                 <label className="font-semibold text-stone-700 block">
-                  Verified Destination Bank Account (NEFT / IMPS)
+                  Payout account reference (UI preview)
                 </label>
                 <input
                   type="text"

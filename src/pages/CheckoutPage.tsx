@@ -29,8 +29,8 @@ export const CheckoutPage: React.FC = () => {
       : designs.find((d) => d.id === id) || designs[0];
 
   const price = item.price;
-  const tax = 0; // Tax row prepared but ₹0 in test mode
-  const total = price + tax;
+  // Phase 1 UI fixture only. The live total will come from checkout-preview.
+  const total = price;
 
   const [paymentMethod, setPaymentMethod] = useState<'upi' | 'card' | 'netbanking'>('upi');
   const [upiId, setUpiId] = useState('manufacturer@okaxis');
@@ -346,11 +346,11 @@ export const CheckoutPage: React.FC = () => {
               </button>
             </div>
 
-            {/* Security Guarantee Note */}
+            {/* Checkout status note */}
             <div className="pt-4 border-t border-stone-100 flex items-center gap-3 text-xs text-stone-500">
               <ShieldCheck className="w-4 h-4 text-emerald-700 shrink-0" />
               <span>
-                100% Secure Checkout. Machine files will be instantly bound to your account with free perpetual re-downloads.
+                This is a checkout preview. Payment status and download access will be confirmed by the server after integration.
               </span>
             </div>
 
@@ -383,12 +383,8 @@ export const CheckoutPage: React.FC = () => {
             {/* Price Calculations */}
             <div className="space-y-2 pt-4 border-t border-stone-100 text-xs">
               <div className="flex justify-between text-stone-600">
-                <span>Base Selling Price</span>
+                <span>Item price</span>
                 <span className="font-mono tabular-nums">₹{price.toLocaleString('en-IN')}</span>
-              </div>
-              <div className="flex justify-between text-stone-400">
-                <span>GST / Tax (Prepared for Live)</span>
-                <span className="font-mono tabular-nums">₹0 (Test Mode)</span>
               </div>
               <div className="pt-2 border-t border-stone-200 flex justify-between font-bold text-sm text-stone-900">
                 <span>Total Amount Due</span>
@@ -398,10 +394,8 @@ export const CheckoutPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Important requirement: Never show platform commission as an additional buyer charge! */}
-            <div className="p-3 bg-stone-50 rounded-xl border border-stone-200/60 text-[11px] text-stone-500 space-y-1">
-              <p className="font-semibold text-stone-700">Fair Marketplace Transparency:</p>
-              <p>Platform digitizer commissions are covered by the seller. No extra buyer fees or hidden checkout surcharges.</p>
+            <div className="p-3 bg-stone-50 rounded-xl border border-stone-200/60 text-[11px] text-stone-500">
+              The final live amount and any applicable breakdown will be supplied by the checkout service before payment.
             </div>
 
           </div>

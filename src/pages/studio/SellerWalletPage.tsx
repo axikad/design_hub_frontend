@@ -102,7 +102,7 @@ export const SellerWalletPage: React.FC = () => {
               <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-amber-900 mb-1">
                 <span>Creator Financial Center</span>
                 <span aria-hidden="true">·</span>
-                <span>Transparent Bi-Weekly Accounting</span>
+                <span>Settlement schedule preview</span>
               </div>
               <h1 className="font-serif text-2xl sm:text-3xl font-bold text-stone-900">
                 Seller Wallet & Settlements
@@ -294,7 +294,7 @@ export const SellerWalletPage: React.FC = () => {
                     Product Sales & Royalty Ledger
                   </h3>
                   <p className="text-xs text-stone-500">
-                    Showing gross buyer purchase, 15% platform commission deduction, and your net earnings.
+                    Showing the buyer amount, server-recorded commission snapshot and seller net earning.
                   </p>
                 </div>
 
@@ -328,7 +328,7 @@ export const SellerWalletPage: React.FC = () => {
                     <tr>
                       <th className="py-3 px-4">Design Item</th>
                       <th className="py-3 px-4">Buyer Paid</th>
-                      <th className="py-3 px-4">Commission (15%)</th>
+                      <th className="py-3 px-4">Commission</th>
                       <th className="py-3 px-4">Seller Net</th>
                       <th className="py-3 px-4">Status</th>
                       <th className="py-3 px-4">Cycle / Scheduled</th>
@@ -450,7 +450,7 @@ export const SellerWalletPage: React.FC = () => {
                         <div className="flex items-center gap-4 text-xs font-mono">
                           <div>
                             <span className="text-stone-400 block text-[10px] uppercase">Sales</span>
-                            <span className="font-bold text-stone-900">{cycle.salesCount} Runs</span>
+                            <span className="font-bold text-stone-900">{cycle.salesCount} sale records</span>
                           </div>
                           <div>
                             <span className="text-stone-400 block text-[10px] uppercase">Amount</span>
@@ -521,7 +521,7 @@ export const SellerWalletPage: React.FC = () => {
                       Request Manual Bank Withdrawal
                     </h3>
                     <p className="text-xs text-stone-500">
-                      Transfer available creator royalties directly to your verified Indian bank account.
+                      Request a payout when the server reports that withdrawals are available for your account.
                     </p>
                   </div>
 
