@@ -458,6 +458,16 @@ Implementation status (21 November 2026): implemented and build-verified; live d
 - Content/legal/business approval.
 - End-to-end test-mode regression.
 
+Implementation status (21 November 2026): in progress; first production-hardening slice is build-verified.
+
+- Added a global render error boundary and optional privacy-minimized client error reporting endpoint.
+- Added a 30-second API timeout with a clear retryable error instead of indefinitely pending requests.
+- Added route-aware document titles, post-navigation focus, a skip link, accessible confirmation dialogs and live toast semantics.
+- Added baseline shared-hosting security headers for MIME sniffing, framing, referrer and browser feature permissions.
+- Removed inactive mock marketplace fixtures from the active application bundle.
+- Compressed the home hero from roughly 1.13 MB to 304 KB; the production build no longer ships three unused fixture images, removing roughly 3.4 MB more.
+- Remaining Phase 7 work: live responsive/keyboard acceptance, content/legal approval, monitoring endpoint selection and full end-to-end test-mode regression.
+
 ## 11. Phase 1 acceptance checklist
 
 - [x] No unverified count, rating, testimonial, guarantee or payout claim is displayed on an active route.

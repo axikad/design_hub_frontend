@@ -103,6 +103,14 @@ export const apiRequest = async <T>(
   } = {},
 ): Promise<T> => {
   let response: Response;
+  let timedOut = false;
+  const requestController = new AbortController();
+  const abortFromCaller = () => requestController.abort();
+  options.signal?.addEventListener('abort', abortFromCaller, { once: true });
+  const timeoutId = window.setTimeout(() => {
+    timedOut = true;
+    requestController.abort();
+  }, 30_000);
   const token = sessionToken.get();
   const headers: Record<string, string> = { Accept: 'application/json' };
   if (token) headers.Authorization = `Bearer ${token}`;
@@ -112,11 +120,17 @@ export const apiRequest = async <T>(
       method: options.method ?? 'GET',
       headers,
       body: options.body instanceof FormData ? options.body : options.body ? JSON.stringify(options.body) : undefined,
-      signal: options.signal,
+      signal: requestController.signal,
     });
   } catch (error) {
-    if (error instanceof DOMException && error.name === 'AbortError') throw error;
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      if (timedOut) throw new ApiError('The marketplace service took too long to respond. Please try again.', 0, 'request_timeout');
+      throw error;
+    }
     throw new ApiError('Unable to reach the marketplace service. Check your connection and try again.', 0, 'network_error');
+  } finally {
+    window.clearTimeout(timeoutId);
+    options.signal?.removeEventListener('abort', abortFromCaller);
   }
 
   const body = (await response.json().catch(() => null)) as ApiErrorBody | T | null;

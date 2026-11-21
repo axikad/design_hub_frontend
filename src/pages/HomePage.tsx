@@ -5,7 +5,7 @@ import { CollectionCard } from '../components/common/CollectionCard';
 import { DesignCard } from '../components/common/DesignCard';
 import { LoadingSkeleton } from '../components/common/LoadingSkeleton';
 import { useApp } from '../context/AppContext';
-import { ASSET_IMAGES } from '../data/mockData';
+import heroImage from '../assets/images/hero_textile_embroidery_1793879816875.jpg';
 import { getErrorMessage, marketplaceApi } from '../lib/api-client';
 import { toDesignCard, toFolderCard } from '../lib/marketplace-mappers';
 import type { ApiFolder, ApiHomeData, BrowseFilters } from '../types/marketplace';
@@ -73,7 +73,7 @@ export const HomePage: React.FC = () => {
             </form>
             <p className="mt-6 inline-flex items-center gap-2 text-xs text-stone-500"><Compass className="h-4 w-4 text-amber-700" />Catalog data is loaded from the live marketplace service.</p>
           </div>
-          <div className="relative mx-auto w-full max-w-xl"><div className="overflow-hidden rounded-[2rem] border border-stone-200 bg-stone-100 shadow-2xl shadow-stone-900/10"><img src={ASSET_IMAGES.hero} alt="Detailed textile embroidery design" className="aspect-[4/3] w-full object-cover" /></div><div className="absolute -bottom-5 left-5 right-5 rounded-2xl border border-stone-700 bg-stone-950 p-4 text-white shadow-xl sm:left-8 sm:right-8"><p className="text-[10px] font-bold uppercase tracking-[0.18em] text-amber-300">Review before purchase</p><p className="mt-1 text-sm text-stone-200">Compare machine, dimensions and design-type specifications.</p></div></div>
+          <div className="relative mx-auto w-full max-w-xl"><div className="overflow-hidden rounded-[2rem] border border-stone-200 bg-stone-100 shadow-2xl shadow-stone-900/10"><img src={heroImage} width="1376" height="768" fetchPriority="high" alt="Detailed textile embroidery design" className="aspect-[4/3] w-full object-cover" /></div><div className="absolute -bottom-5 left-5 right-5 rounded-2xl border border-stone-700 bg-stone-950 p-4 text-white shadow-xl sm:left-8 sm:right-8"><p className="text-[10px] font-bold uppercase tracking-[0.18em] text-amber-300">Review before purchase</p><p className="mt-1 text-sm text-stone-200">Compare machine, dimensions and design-type specifications.</p></div></div>
         </div>
       </section>
 

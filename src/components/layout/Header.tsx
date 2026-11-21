@@ -60,9 +60,9 @@ export const Header: React.FC = () => {
           </Link>
 
           <nav aria-label="Primary navigation" className="hidden items-center gap-7 text-sm lg:flex">
-            <Link to="/explore" className={navClass('/explore')}>Explore</Link>
-            <Link to="/collections" className={navClass('/collections')}>Design folders</Link>
-            {user.isLoggedIn && user.role === 'seller' && <Link to="/studio" className={navClass('/studio')}>My studio</Link>}
+            <Link to="/explore" aria-current={active('/explore') ? 'page' : undefined} className={navClass('/explore')}>Explore</Link>
+            <Link to="/collections" aria-current={active('/collections') ? 'page' : undefined} className={navClass('/collections')}>Design folders</Link>
+            {user.isLoggedIn && user.role === 'seller' && <Link to="/studio" aria-current={active('/studio') ? 'page' : undefined} className={navClass('/studio')}>My studio</Link>}
           </nav>
 
           <div className="flex items-center gap-1 sm:gap-2">

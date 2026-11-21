@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { Suspense, lazy, useEffect } from 'react';
+import React, { Suspense, lazy, useEffect, useRef } from 'react';
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { AppProvider, useApp } from './context/AppContext';
 import { Header } from './components/layout/Header';
@@ -36,11 +36,32 @@ const HelpCenterPage = page(() => import('./pages/legal/LegalPages'), 'HelpCente
 const ContactPage = page(() => import('./pages/legal/LegalPages'), 'ContactPage');
 const NotFoundPage = page(() => import('./pages/legal/LegalPages'), 'NotFoundPage');
 
-// Scroll to top on route navigation
-const ScrollToTop = () => {
+const routeTitles: Record<string, string> = {
+  '/': 'Textile Design Hub',
+  '/explore': 'Explore designs',
+  '/collections': 'Design folders',
+  '/auth': 'Sign in',
+  '/account': 'My account',
+  '/account/purchases': 'My purchases',
+  '/studio': 'My studio',
+  '/studio/designs': 'My designs',
+  '/studio/collections': 'My folders',
+  '/studio/wallet': 'Wallet & settlements',
+};
+
+const RouteEffects = () => {
   const { pathname } = useLocation();
+  const firstRender = useRef(true);
   useEffect(() => {
     window.scrollTo(0, 0);
+    const exactTitle = routeTitles[pathname];
+    const sectionTitle = pathname.startsWith('/design/') ? 'Design details' : pathname.startsWith('/collections/') ? 'Folder details' : undefined;
+    document.title = `${exactTitle || sectionTitle || 'Textile Design Hub'} | Textile Design Hub`;
+    if (firstRender.current) {
+      firstRender.current = false;
+      return;
+    }
+    window.requestAnimationFrame(() => document.getElementById('main-content')?.focus());
   }, [pathname]);
   return null;
 };
@@ -56,7 +77,7 @@ const RequireAccount: React.FC<{ children: React.ReactNode; seller?: boolean }> 
   const location = useLocation();
   if (!authReady) return <PageLoading />;
   if (!user.isLoggedIn) return <Navigate to="/auth" replace state={{ returnTo: `${location.pathname}${location.search}` }} />;
-  if (seller && user.role !== 'seller') return <main className="mx-auto flex min-h-[55vh] max-w-xl items-center px-4 py-16"><div className="w-full rounded-2xl border border-amber-200 bg-amber-50 p-8 text-center"><p className="text-xs font-bold uppercase tracking-[0.18em] text-amber-800">403 · Permission required</p><h1 className="mt-3 font-serif text-2xl font-semibold text-stone-950">Creator access is not enabled</h1><p className="mt-2 text-sm leading-6 text-stone-600">Your account is signed in, but it does not have permission to use seller tools.</p></div></main>;
+  if (seller && user.role !== 'seller') return <div className="mx-auto flex min-h-[55vh] max-w-xl items-center px-4 py-16"><div className="w-full rounded-2xl border border-amber-200 bg-amber-50 p-8 text-center"><p className="text-xs font-bold uppercase tracking-[0.18em] text-amber-800">403 · Permission required</p><h1 className="mt-3 font-serif text-2xl font-semibold text-stone-950">Creator access is not enabled</h1><p className="mt-2 text-sm leading-6 text-stone-600">Your account is signed in, but it does not have permission to use seller tools.</p></div></div>;
   return <>{children}</>;
 };
 
@@ -64,13 +85,14 @@ export default function App() {
   return (
     <AppProvider>
       <BrowserRouter>
-        <ScrollToTop />
+        <RouteEffects />
         <div className="flex flex-col min-h-screen text-stone-900 bg-[#FAF8F5]">
+          <a href="#main-content" className="sr-only z-[100] rounded-lg bg-stone-950 px-4 py-2 text-sm font-semibold text-white focus:not-sr-only focus:fixed focus:left-4 focus:top-4">Skip to main content</a>
           <Header />
           <div className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-center text-[11px] font-medium text-amber-950">
             Live marketplace catalog, secure Razorpay checkout and protected buyer downloads
           </div>
-          <div className="flex-1">
+          <main id="main-content" tabIndex={-1} className="flex-1 focus:outline-none">
             <Suspense fallback={<PageLoading />}>
             <Routes>
               {/* Public Discovery Routes */}
@@ -112,7 +134,7 @@ export default function App() {
               <Route path="*" element={<NotFoundPage />} />
             </Routes>
             </Suspense>
-          </div>
+          </main>
           <Footer />
           <MobileBottomNav />
           <ToastContainer />

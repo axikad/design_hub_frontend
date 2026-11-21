@@ -1,12 +1,9 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
-import {
+import type {
   CollectionItem,
   CreatorItem,
   DesignItem,
   PurchaseRecord,
-  COLLECTIONS as INITIAL_COLLECTIONS,
-  CREATORS,
-  DESIGNS as INITIAL_DESIGNS,
 } from '../data/mockData';
 import { accountApi, ApiError, authApi, sessionToken } from '../lib/api-client';
 import { normalizeAssetUrl } from '../lib/marketplace-mappers';
@@ -105,14 +102,9 @@ const mapPurchase = (purchase: ApiPurchase): PurchaseRecord => ({
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<UserProfile>(emptyUser);
   const [authReady, setAuthReady] = useState(false);
-  const [designs] = useState<DesignItem[]>(() => {
-    const saved = localStorage.getItem('tdh_designs');
-    return saved ? JSON.parse(saved) : INITIAL_DESIGNS;
-  });
-  const [collections] = useState<CollectionItem[]>(() => {
-    const saved = localStorage.getItem('tdh_collections');
-    return saved ? JSON.parse(saved) : INITIAL_COLLECTIONS;
-  });
+  const designs: DesignItem[] = [];
+  const collections: CollectionItem[] = [];
+  const creators: CreatorItem[] = [];
   const [savedDesignIds, setSavedDesignIds] = useState<string[]>([]);
   const [purchases, setPurchases] = useState<PurchaseRecord[]>([]);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
@@ -191,7 +183,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   return <AppContext.Provider value={{
-    user, designs, collections, creators: CREATORS, savedDesignIds, purchases, toasts, authReady,
+    user, designs, collections, creators, savedDesignIds, purchases, toasts, authReady,
     showToast, removeToast, toggleSaveDesign, isSaved: (id) => savedDesignIds.includes(id),
     isPurchased: (id) => purchases.some((purchase) => purchase.itemId === id), updateUserProfile,
     establishSession, refreshUser, refreshAccountData: loadAccountCollections, logout, searchQuery, setSearchQuery,
