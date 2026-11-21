@@ -39,7 +39,7 @@ export const toDesignCard = (design: ApiDesign, filters?: BrowseFilters | null):
 
   return {
     id: design.id,
-    title: design.title,
+    title: design.displayName || design.title,
     category: design.categoryName || 'Uncategorized',
     machine,
     stitches: variants.reduce((total, variant) => total + numberValue(variant.details.stitchCount), 0),

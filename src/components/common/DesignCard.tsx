@@ -81,20 +81,20 @@ export const DesignCard: React.FC<DesignCardProps> = ({ design, viewMode = 'grid
           <span className="font-mono font-semibold">{design.stitches.toLocaleString('en-IN')} stitches</span><span className="font-mono text-stone-200">{dimensions}</span>
         </div>
       </div>
-      <div className="flex flex-1 flex-col p-4">
+      <div className="flex flex-1 flex-col p-3.5">
         <div className="flex items-center gap-2 text-[10px] uppercase tracking-wider text-stone-500"><span className="truncate font-semibold text-amber-800">{design.category}</span><span>·</span><span className="truncate">{design.machine}</span></div>
-        <Link to={`/design/${design.id}`} title={design.title} className="mt-2 block line-clamp-2 font-serif text-lg font-semibold leading-6 text-stone-950 transition group-hover:text-amber-900">{design.title}</Link>
-        <p className="mt-2 line-clamp-2 text-xs leading-5 text-stone-500">{design.description}</p>
-        <div className="mt-4 flex items-center justify-between gap-2 border-t border-stone-100 pt-3 text-[11px] text-stone-500">
+        <Link to={`/design/${design.id}`} title={design.title} className="mt-1.5 block line-clamp-1 font-serif text-base font-semibold leading-5 text-stone-950 transition group-hover:text-amber-900">{design.title}</Link>
+        <p className="mt-1.5 line-clamp-1 text-[11px] leading-4 text-stone-500">{design.description}</p>
+        <div className="mt-2.5 flex items-center justify-between gap-2 border-t border-stone-100 pt-2.5 text-[10px] text-stone-500">
           <span className="inline-flex min-w-0 items-center gap-1.5"><SellerAvatar design={design} /><span className="truncate">{design.sellerName}</span></span>
           <span className="shrink-0 font-mono text-[10px] text-stone-400">{design.formats.slice(0, 3).join(' · ') || 'FILE'}</span>
         </div>
-        <div className="mt-auto flex items-center justify-between gap-3 border-t border-stone-100 pt-4">
+        <div className="mt-2.5 flex items-center justify-between gap-3 border-t border-stone-100 pt-2.5">
           <div className="min-w-0">
             <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-stone-400">Price</p>
-            <p className="font-mono text-xl font-bold leading-none text-stone-950">{formatInr(design.price)}</p>
+            <p className="font-mono text-lg font-bold leading-none text-stone-950">{formatInr(design.price)}</p>
           </div>
-          <Link to={`/design/${design.id}`} className="inline-flex shrink-0 items-center rounded-lg bg-stone-950 px-3.5 py-2.5 text-xs font-semibold whitespace-nowrap text-white transition hover:bg-amber-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-700 focus-visible:ring-offset-2">{purchased ? 'Open files' : 'View details'} <span aria-hidden="true" className="ml-1">→</span></Link>
+          <Link to={`/design/${design.id}`} className="inline-flex shrink-0 items-center rounded-lg bg-stone-950 px-3 py-2 text-[11px] font-semibold whitespace-nowrap text-white transition hover:bg-amber-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-700 focus-visible:ring-offset-2">{purchased ? 'Open files' : 'View details'} <span aria-hidden="true" className="ml-1">→</span></Link>
         </div>
       </div>
     </article>
