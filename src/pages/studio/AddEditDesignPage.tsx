@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, Image as ImageIcon, LoaderCircle, Plus, Save, Trash2, UploadCloud } from 'lucide-react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { StudioNavigation } from '../../components/studio/StudioNavigation';
 import { useApp } from '../../context/AppContext';
 import { ApiError, getErrorMessage, studioApi } from '../../lib/api-client';
 import type { ApiDesign, ApiImage } from '../../types/marketplace';
@@ -292,11 +293,12 @@ export const AddEditDesignPage: React.FC = () => {
   };
 
   if (loading || !options || !config) {
-    return <div className="flex min-h-[70vh] items-center justify-center bg-[#FAF8F5] text-stone-500"><LoaderCircle className="mr-2 h-5 w-5 animate-spin" /> Loading design form…</div>;
+    return <main className="min-h-screen bg-[#FAF8F5]"><StudioNavigation /><div className="flex min-h-[50vh] items-center justify-center text-stone-500"><LoaderCircle className="mr-2 h-5 w-5 animate-spin" /> Loading design form…</div></main>;
   }
 
   return (
     <main className="min-h-screen bg-[#FAF8F5] pb-24">
+      <StudioNavigation />
       <header className="border-b border-stone-200 bg-white py-6">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-4 sm:px-6">
           <div className="flex items-center gap-3"><Link to="/studio/designs" className="rounded-lg p-2 text-stone-500 hover:bg-stone-100"><ArrowLeft className="h-5 w-5" /></Link><div><p className="text-xs font-bold uppercase tracking-wider text-amber-800">Creator studio</p><h1 className="font-serif text-2xl font-semibold text-stone-950">{isEdit ? 'Edit design' : 'Add design'}</h1></div></div>

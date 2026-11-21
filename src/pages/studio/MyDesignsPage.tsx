@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Edit2, Eye, Layers, LoaderCircle, Search, Trash2, UploadCloud } from 'lucide-react';
+import { Edit2, Eye, Layers, LoaderCircle, Search, Trash2 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ConfirmationDialog } from '../../components/common/ConfirmationDialog';
 import { EmptyState } from '../../components/common/EmptyState';
+import { StudioNavigation } from '../../components/studio/StudioNavigation';
 import { useApp } from '../../context/AppContext';
 import { ApiError, getErrorMessage, studioApi } from '../../lib/api-client';
 import type { ApiDesign, PaginationMeta } from '../../types/marketplace';
@@ -80,26 +81,10 @@ export const MyDesignsPage: React.FC = () => {
         onConfirm={() => void confirmDelete()}
       />
 
-      <header className="border-b border-stone-200 bg-white py-8">
-        <div className="mx-auto flex max-w-7xl flex-col justify-between gap-4 px-4 sm:flex-row sm:items-end sm:px-6 lg:px-8">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-[0.18em] text-amber-800">Creator studio</p>
-            <h1 className="mt-2 font-serif text-3xl font-semibold text-stone-950">My designs</h1>
-            <p className="mt-1 text-sm text-stone-500">Manage the listings owned by your account.</p>
-          </div>
-          <Link to="/studio/designs/new" className="inline-flex items-center justify-center gap-2 rounded-xl bg-stone-950 px-5 py-3 text-sm font-semibold text-white hover:bg-amber-900">
-            <UploadCloud className="h-4 w-4" /> Add design
-          </Link>
-        </div>
-      </header>
+      <StudioNavigation />
 
       <div className="mx-auto max-w-7xl space-y-6 px-4 pt-8 sm:px-6 lg:px-8">
-        <nav className="flex flex-wrap gap-2 rounded-xl border border-stone-200 bg-white p-2 text-xs font-semibold">
-          <Link to="/studio" className="rounded-lg px-4 py-2 text-stone-600 hover:bg-stone-100">Dashboard</Link>
-          <span className="rounded-lg bg-stone-950 px-4 py-2 text-white">My designs {meta ? `(${meta.total})` : ''}</span>
-          <Link to="/studio/collections" className="rounded-lg px-4 py-2 text-stone-600 hover:bg-stone-100">Design folders</Link>
-          <Link to="/studio/wallet" className="rounded-lg px-4 py-2 text-stone-600 hover:bg-stone-100">Wallet & ledger</Link>
-        </nav>
+        <div><p className="text-xs font-bold uppercase tracking-[0.18em] text-amber-800">Marketplace inventory</p><h2 className="mt-1 font-serif text-3xl font-semibold text-stone-950">My designs</h2><p className="mt-1 text-sm text-stone-500">Manage the listings owned by your account.</p></div>
 
         <form onSubmit={applySearch} className="flex gap-2 rounded-xl border border-stone-200 bg-white p-4">
           <label className="relative block flex-1">

@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { ArrowRight, FolderOpen, LayoutDashboard, LoaderCircle, UploadCloud, Wallet } from 'lucide-react';
+import { ArrowRight, FolderOpen, LoaderCircle, UploadCloud, Wallet } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { StudioNavigation } from '../../components/studio/StudioNavigation';
 import { useApp } from '../../context/AppContext';
 import { getErrorMessage, studioApi } from '../../lib/api-client';
 import type { ApiDesign, ApiFolder } from '../../types/marketplace';
 
 export const StudioDashboardPage: React.FC = () => {
-  const { user, showToast } = useApp();
+  const { showToast } = useApp();
   const [designs, setDesigns] = useState<ApiDesign[]>([]);
   const [folders, setFolders] = useState<ApiFolder[]>([]);
   const [designTotal, setDesignTotal] = useState(0);
@@ -35,24 +36,9 @@ export const StudioDashboardPage: React.FC = () => {
 
   return (
     <main className="min-h-screen bg-[#FAF8F5] pb-24">
-      <section className="border-b border-stone-800 bg-stone-950 text-white">
-        <div className="mx-auto flex max-w-7xl flex-col justify-between gap-6 px-4 py-10 sm:px-6 md:flex-row md:items-center lg:px-8">
-          <div className="flex items-center gap-4">
-            <img src={user.avatar} alt="" className="h-14 w-14 rounded-2xl object-cover ring-1 ring-stone-700" />
-            <div><p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-300">Creator studio</p><h1 className="mt-1 font-serif text-3xl font-semibold">{user.name}</h1><p className="mt-1 text-sm text-stone-400">Manage your live marketplace designs and folders.</p></div>
-          </div>
-          <Link to="/studio/designs/new" className="inline-flex items-center justify-center gap-2 rounded-xl bg-amber-300 px-5 py-3 text-sm font-bold text-stone-950 hover:bg-amber-200"><UploadCloud className="h-4 w-4" />Add design</Link>
-        </div>
-      </section>
+      <StudioNavigation />
 
       <div className="mx-auto max-w-7xl space-y-8 px-4 py-8 sm:px-6 lg:px-8">
-        <nav aria-label="Studio sections" className="flex gap-2 overflow-x-auto rounded-xl border border-stone-200 bg-white p-2 text-sm">
-          <span className="inline-flex shrink-0 items-center gap-2 rounded-lg bg-stone-950 px-4 py-2.5 font-semibold text-white"><LayoutDashboard className="h-4 w-4" />Overview</span>
-          <Link to="/studio/designs" className="shrink-0 rounded-lg px-4 py-2.5 font-medium text-stone-600 hover:bg-stone-50">My designs {loading ? '' : `(${designTotal})`}</Link>
-          <Link to="/studio/collections" className="shrink-0 rounded-lg px-4 py-2.5 font-medium text-stone-600 hover:bg-stone-50">Folders {loading ? '' : `(${folderTotal})`}</Link>
-          <Link to="/studio/wallet" className="shrink-0 rounded-lg px-4 py-2.5 font-medium text-stone-600 hover:bg-stone-50">Wallet</Link>
-        </nav>
-
         {loading ? <div className="flex min-h-48 items-center justify-center rounded-2xl border border-stone-200 bg-white text-stone-500"><LoaderCircle className="mr-2 h-5 w-5 animate-spin" />Loading studio…</div> : <>
           <section className="grid gap-4 sm:grid-cols-2">
             <Link to="/studio/designs" className="rounded-2xl border border-stone-200 bg-white p-6 transition hover:border-amber-400"><UploadCloud className="h-5 w-5 text-amber-800" /><p className="mt-4 text-xs font-semibold uppercase tracking-wider text-stone-500">Marketplace designs</p><p className="mt-1 font-mono text-3xl font-bold text-stone-950">{designTotal}</p><p className="mt-2 text-sm text-stone-500">Create, edit and remove records owned by this account.</p></Link>

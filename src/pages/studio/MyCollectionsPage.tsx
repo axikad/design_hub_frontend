@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Archive, Eye, FolderPlus, LoaderCircle, Search, UploadCloud, X } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Archive, Eye, LoaderCircle, Search, UploadCloud, X } from 'lucide-react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { StudioNavigation } from '../../components/studio/StudioNavigation';
 import { useApp } from '../../context/AppContext';
 import { ApiError, getErrorMessage, studioApi } from '../../lib/api-client';
 import type { ApiFolder, PaginationMeta } from '../../types/marketplace';
@@ -12,6 +13,7 @@ const formatBytes = (bytes: number) => bytes >= 1024 * 1024
 
 export const MyCollectionsPage: React.FC = () => {
   const { showToast } = useApp();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [folders, setFolders] = useState<ApiFolder[]>([]);
   const [meta, setMeta] = useState<PaginationMeta | null>(null);
   const [page, setPage] = useState(1);
@@ -44,6 +46,12 @@ export const MyCollectionsPage: React.FC = () => {
     return () => controller.abort();
   }, [loadFolders]);
 
+  useEffect(() => {
+    if (searchParams.get('create') !== '1') return;
+    setDialogOpen(true);
+    setSearchParams({}, { replace: true });
+  }, [searchParams, setSearchParams]);
+
   const createFolder = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!archive) {
@@ -74,10 +82,10 @@ export const MyCollectionsPage: React.FC = () => {
 
   return (
     <main className="min-h-screen bg-[#FAF8F5] pb-24">
+      <StudioNavigation />
       <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
-        <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
+        <div>
           <div><p className="text-xs font-bold uppercase tracking-[0.18em] text-amber-800">Creator studio</p><h1 className="mt-2 font-serif text-4xl font-semibold text-stone-950">Design folders</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-stone-500">Upload one ZIP or RAR archive. The server extracts its files and prepares buyer previews.</p></div>
-          <button type="button" onClick={() => setDialogOpen(true)} className="inline-flex items-center justify-center gap-2 rounded-xl bg-stone-950 px-5 py-3 text-sm font-semibold text-white hover:bg-amber-900"><FolderPlus className="h-4 w-4" />Add folder</button>
         </div>
 
         <div className="mt-8 flex flex-col justify-between gap-4 rounded-xl border border-stone-200 bg-white p-4 sm:flex-row sm:items-center">
