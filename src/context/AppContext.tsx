@@ -1,21 +1,12 @@
-import React, { createContext, useCallback, useContext, useState, useEffect } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import {
-  DesignItem,
   CollectionItem,
   CreatorItem,
+  DesignItem,
   PurchaseRecord,
-  EarningRecord,
-  SettlementCycle,
-  WithdrawalRequest,
-  LedgerItem,
-  DESIGNS as INITIAL_DESIGNS,
   COLLECTIONS as INITIAL_COLLECTIONS,
   CREATORS,
-  INITIAL_EARNINGS,
-  INITIAL_SETTLEMENT_CYCLES,
-  INITIAL_WITHDRAWALS,
-  INITIAL_LEDGER,
-  ASSET_IMAGES,
+  DESIGNS as INITIAL_DESIGNS,
 } from '../data/mockData';
 import { accountApi, ApiError, authApi, sessionToken } from '../lib/api-client';
 import { normalizeAssetUrl } from '../lib/marketplace-mappers';
@@ -53,31 +44,13 @@ interface AppContextType {
   creators: CreatorItem[];
   savedDesignIds: string[];
   purchases: PurchaseRecord[];
-  wallet: {
-    pending: number;
-    available: number;
-    reserved: number;
-    paid: number;
-    waitingAmount: number;
-    nextSettlementDate: string;
-    settlementMode: 'manual' | 'automatic';
-  };
-  earnings: EarningRecord[];
-  settlementCycles: SettlementCycle[];
-  withdrawals: WithdrawalRequest[];
-  ledger: LedgerItem[];
   toasts: ToastMessage[];
   authReady: boolean;
-  // Actions
   showToast: (title: string, message?: string, type?: 'success' | 'info' | 'error') => void;
   removeToast: (id: string) => void;
   toggleSaveDesign: (id: string) => Promise<void>;
   isSaved: (id: string) => boolean;
   isPurchased: (id: string) => boolean;
-  addPurchase: (item: DesignItem | CollectionItem, type: 'design' | 'collection', amount: number) => PurchaseRecord;
-  requestWithdrawal: (amount: number, bank: string) => boolean;
-  cancelWithdrawal: (id: string) => void;
-  setSettlementMode: (mode: 'manual' | 'automatic') => void;
   updateUserProfile: (updates: Partial<UserProfile>) => void;
   establishSession: (result: AuthResult) => Promise<void>;
   refreshUser: () => Promise<void>;
@@ -90,21 +63,9 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 const emptyUser: UserProfile = {
-  id: '',
-  name: '',
-  email: '',
-  phone: '',
-  countryCode: '+91',
-  avatar: '',
-  role: 'buyer',
-  machinePreferences: [],
-  settlementMode: 'manual',
-  isLoggedIn: false,
-  bankAccount: '',
-  companyName: '',
-  gstNumber: '',
-  location: '',
-  permissions: [],
+  id: '', name: '', email: '', phone: '', countryCode: '+91', avatar: '', role: 'buyer',
+  machinePreferences: [], settlementMode: 'manual', isLoggedIn: false, bankAccount: '',
+  companyName: '', gstNumber: '', location: '', permissions: [],
 };
 
 const canUseSellerTools = (user: ApiUser) =>
@@ -144,58 +105,25 @@ const mapPurchase = (purchase: ApiPurchase): PurchaseRecord => ({
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<UserProfile>(emptyUser);
   const [authReady, setAuthReady] = useState(false);
-
-  const [designs, setDesigns] = useState<DesignItem[]>(() => {
+  const [designs] = useState<DesignItem[]>(() => {
     const saved = localStorage.getItem('tdh_designs');
     return saved ? JSON.parse(saved) : INITIAL_DESIGNS;
   });
-
-  const [collections, setCollections] = useState<CollectionItem[]>(() => {
+  const [collections] = useState<CollectionItem[]>(() => {
     const saved = localStorage.getItem('tdh_collections');
     return saved ? JSON.parse(saved) : INITIAL_COLLECTIONS;
   });
-
   const [savedDesignIds, setSavedDesignIds] = useState<string[]>([]);
-
   const [purchases, setPurchases] = useState<PurchaseRecord[]>([]);
-
-  const [wallet, setWallet] = useState({
-    pending: 18450,
-    available: 42800,
-    reserved: 25000,
-    paid: 124600,
-    waitingAmount: 18450,
-    nextSettlementDate: 'Nov 12, 2026',
-    settlementMode: 'manual' as 'manual' | 'automatic',
-  });
-
-  const [earnings, setEarnings] = useState<EarningRecord[]>(INITIAL_EARNINGS);
-  const [settlementCycles] = useState<SettlementCycle[]>(INITIAL_SETTLEMENT_CYCLES);
-  const [withdrawals, setWithdrawals] = useState<WithdrawalRequest[]>(INITIAL_WITHDRAWALS);
-  const [ledger, setLedger] = useState<LedgerItem[]>(INITIAL_LEDGER);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Persist local state
-  useEffect(() => {
-    localStorage.setItem('tdh_designs', JSON.stringify(designs));
-  }, [designs]);
-
-  useEffect(() => {
-    localStorage.setItem('tdh_collections', JSON.stringify(collections));
-  }, [collections]);
-
   const showToast = (title: string, message?: string, type: 'success' | 'info' | 'error' = 'success') => {
-    const id = 'toast_' + Math.random().toString(36).substring(2, 9);
-    setToasts((prev) => [...prev, { id, title, message, type }]);
-    setTimeout(() => {
-      setToasts((prev) => prev.filter((t) => t.id !== id));
-    }, 4500);
+    const id = `toast_${Math.random().toString(36).substring(2, 9)}`;
+    setToasts((previous) => [...previous, { id, title, message, type }]);
+    window.setTimeout(() => setToasts((previous) => previous.filter((toast) => toast.id !== id)), 4500);
   };
-
-  const removeToast = (id: string) => {
-    setToasts((prev) => prev.filter((t) => t.id !== id));
-  };
+  const removeToast = (id: string) => setToasts((previous) => previous.filter((toast) => toast.id !== id));
 
   const loadAccountCollections = useCallback(async () => {
     const [saved, paid] = await Promise.all([
@@ -214,44 +142,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     let active = true;
     const bootstrap = async () => {
-      if (!sessionToken.get()) {
-        if (active) setAuthReady(true);
-        return;
-      }
+      if (!sessionToken.get()) { if (active) setAuthReady(true); return; }
       try {
         const response = await authApi.me();
         if (!active) return;
         setUser(mapUser(response.data));
-        try {
-          await loadAccountCollections();
-        } catch {
-          setSavedDesignIds([]);
-          setPurchases([]);
-        }
+        try { await loadAccountCollections(); } catch { setSavedDesignIds([]); setPurchases([]); }
       } catch {
-        if (active) {
-          sessionToken.clear();
-          setUser(emptyUser);
-          setSavedDesignIds([]);
-          setPurchases([]);
-        }
-      } finally {
-        if (active) setAuthReady(true);
-      }
+        if (active) { sessionToken.clear(); setUser(emptyUser); setSavedDesignIds([]); setPurchases([]); }
+      } finally { if (active) setAuthReady(true); }
     };
-    const unauthorized = () => {
-      setUser(emptyUser);
-      setSavedDesignIds([]);
-      setPurchases([]);
-      setAuthReady(true);
-    };
+    const unauthorized = () => { setUser(emptyUser); setSavedDesignIds([]); setPurchases([]); setAuthReady(true); };
     window.addEventListener('designhub:unauthorized', unauthorized);
     void bootstrap();
-    return () => {
-      active = false;
-      window.removeEventListener('designhub:unauthorized', unauthorized);
-    };
-  }, []);
+    return () => { active = false; window.removeEventListener('designhub:unauthorized', unauthorized); };
+  }, [loadAccountCollections]);
 
   const toggleSaveDesign = async (id: string) => {
     const exists = savedDesignIds.includes(id);
@@ -270,225 +175,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const isSaved = (id: string) => savedDesignIds.includes(id);
-
-  const isPurchased = (id: string) => purchases.some((p) => p.itemId === id);
-
-  const addPurchase = (item: DesignItem | CollectionItem, type: 'design' | 'collection', amount: number): PurchaseRecord => {
-    const newRecord: PurchaseRecord = {
-      id: 'pur-' + Date.now().toString().slice(-4),
-      orderNumber: 'ORD-TXH-' + Math.floor(1000 + Math.random() * 9000),
-      type,
-      itemId: item.id,
-      itemTitle: item.title,
-      itemImage: 'coverImage' in item ? item.coverImage : (item.images[0] || ASSET_IMAGES.sareeBorder),
-      category: item.category,
-      sellerName: item.sellerName,
-      amountPaid: amount,
-      date: new Date().toISOString().split('T')[0],
-      status: 'completed',
-      downloadUrls: [
-        { format: 'EMB', filename: `${item.title.replace(/\s+/g, '_')}_master.EMB`, size: '5.2 MB' },
-        { format: 'DST', filename: `${item.title.replace(/\s+/g, '_')}_industrial.DST`, size: '2.8 MB' },
-        { format: 'PES', filename: `${item.title.replace(/\s+/g, '_')}_brother.PES`, size: '2.9 MB' },
-        { format: 'PDF', filename: 'Color_Stop_Production_Sheet.PDF', size: '820 KB' },
-      ],
-    };
-
-    setPurchases((prev) => [newRecord, ...prev]);
-
-    // Also simulate seller earning addition
-    const commission = amount * 0.15;
-    const netEarning = amount - commission;
-    const newEarning: EarningRecord = {
-      id: 'earn-' + Date.now().toString().slice(-4),
-      designName: item.title,
-      image: newRecord.itemImage,
-      buyerPaid: amount,
-      commission,
-      netEarning,
-      status: 'pending',
-      saleDate: 'Just now',
-      settlementCycle: 'Cycle #49 (Nov 5–Nov 10)',
-      scheduledSettlementDate: '2026-11-12',
-      environment: 'Test Mode',
-    };
-    setEarnings((prev) => [newEarning, ...prev]);
-    setWallet((prev) => ({
-      ...prev,
-      pending: prev.pending + netEarning,
-      waitingAmount: prev.waitingAmount + netEarning,
-    }));
-
-    // Add to ledger
-    const newLedgerItem: LedgerItem = {
-      id: 'led-' + Date.now().toString().slice(-4),
-      label: 'Earning added',
-      amount: netEarning,
-      type: 'credit',
-      bucket: 'Pending',
-      dateTime: 'Just now',
-      itemRef: `Order #${newRecord.orderNumber} (${item.title.slice(0, 24)}...)`,
-      rawCode: 'earning_pending_credit',
-    };
-    setLedger((prev) => [newLedgerItem, ...prev]);
-
-    showToast('Payment Successful', `Order #${newRecord.orderNumber} confirmed. Machine files ready for download.`, 'success');
-    return newRecord;
-  };
-
-  const requestWithdrawal = (amount: number, bank: string): boolean => {
-    if (amount < 1000) {
-      showToast('Minimum Withdrawal ₹1,000', 'Please enter at least ₹1,000 for withdrawal.', 'error');
-      return false;
-    }
-    if (amount > wallet.available) {
-      showToast('Insufficient Available Balance', `You only have ₹${wallet.available.toLocaleString('en-IN')} available.`, 'error');
-      return false;
-    }
-
-    const newReq: WithdrawalRequest = {
-      id: 'wdr-' + Math.floor(100 + Math.random() * 900),
-      amount,
-      date: 'Just now',
-      status: 'Requested',
-      bankAccount: bank || user.bankAccount,
-      referenceId: 'REQ-TXH-' + Math.floor(10000 + Math.random() * 90000),
-      canCancel: true,
-    };
-
-    setWithdrawals((prev) => [newReq, ...prev]);
-    setWallet((prev) => ({
-      ...prev,
-      available: prev.available - amount,
-      reserved: prev.reserved + amount,
-    }));
-
-    // Ledger record
-    const ledgerEntry: LedgerItem = {
-      id: 'led-' + Date.now().toString().slice(-4),
-      label: 'Withdrawal reserved',
-      amount,
-      type: 'debit',
-      bucket: 'Available',
-      dateTime: 'Just now',
-      itemRef: `Withdrawal Request #${newReq.id}`,
-      rawCode: 'withdrawal_reserve_available_debit',
-    };
-    setLedger((prev) => [ledgerEntry, ...prev]);
-
-    showToast('Withdrawal Requested', `₹${amount.toLocaleString('en-IN')} reserved for payout processing.`, 'success');
-    return true;
-  };
-
-  const cancelWithdrawal = (id: string) => {
-    const target = withdrawals.find((w) => w.id === id);
-    if (!target || !target.canCancel) return;
-
-    setWithdrawals((prev) =>
-      prev.map((w) => (w.id === id ? { ...w, status: 'Cancelled', canCancel: false } : w))
-    );
-    setWallet((prev) => ({
-      ...prev,
-      available: prev.available + target.amount,
-      reserved: prev.reserved - target.amount,
-    }));
-
-    const ledgerEntry: LedgerItem = {
-      id: 'led-' + Date.now().toString().slice(-4),
-      label: 'Withdrawal cancelled',
-      amount: target.amount,
-      type: 'credit',
-      bucket: 'Available',
-      dateTime: 'Just now',
-      itemRef: `Withdrawal #${target.id} Cancelled`,
-      rawCode: 'withdrawal_cancelled_available_credit',
-    };
-    setLedger((prev) => [ledgerEntry, ...prev]);
-
-    showToast('Withdrawal Cancelled', `₹${target.amount.toLocaleString('en-IN')} returned to your available balance.`, 'info');
-  };
-
-  const setSettlementMode = (mode: 'manual' | 'automatic') => {
-    setWallet((prev) => ({ ...prev, settlementMode: mode }));
-    setUser((prev) => ({ ...prev, settlementMode: mode }));
-    showToast('Settlement Mode Updated', `Switched to ${mode === 'automatic' ? 'Automatic Bank Transfer' : 'Manual Payout Request'} mode.`, 'info');
-  };
-
   const updateUserProfile = (updates: Partial<UserProfile>) => {
-    setUser((prev) => ({ ...prev, ...updates }));
-    showToast('Profile Updated', 'Your account settings have been saved.', 'success');
+    setUser((previous) => ({ ...previous, ...updates }));
+    showToast('Profile updated', 'Your local account view has been updated.', 'success');
   };
-
   const establishSession = async (result: AuthResult) => {
-    sessionToken.set(result.accessToken);
-    setUser(mapUser(result.user));
-    setAuthReady(true);
-    try {
-      await loadAccountCollections();
-    } catch {
-      setSavedDesignIds([]);
-      setPurchases([]);
-    }
+    sessionToken.set(result.accessToken); setUser(mapUser(result.user)); setAuthReady(true);
+    try { await loadAccountCollections(); } catch { setSavedDesignIds([]); setPurchases([]); }
     showToast('Welcome to Textile Design Hub', 'Signed in successfully.', 'success');
   };
-
   const logout = async () => {
-    try {
-      if (sessionToken.get()) await authApi.logout();
-    } catch {
-      // Local sign-out still completes when a token is expired or the network is unavailable.
-    }
-    sessionToken.clear();
-    setUser(emptyUser);
-    setSavedDesignIds([]);
-    setPurchases([]);
-    showToast('Signed Out', 'You have been safely signed out.', 'info');
+    try { if (sessionToken.get()) await authApi.logout(); } catch { /* Local sign-out still completes. */ }
+    sessionToken.clear(); setUser(emptyUser); setSavedDesignIds([]); setPurchases([]);
+    showToast('Signed out', 'You have been safely signed out.', 'info');
   };
 
-  return (
-    <AppContext.Provider
-      value={{
-        user,
-        designs,
-        collections,
-        creators: CREATORS,
-        savedDesignIds,
-        purchases,
-        wallet,
-        earnings,
-        settlementCycles,
-        withdrawals,
-        ledger,
-        toasts,
-        authReady,
-        showToast,
-        removeToast,
-        toggleSaveDesign,
-        isSaved,
-        isPurchased,
-        addPurchase,
-        requestWithdrawal,
-        cancelWithdrawal,
-        setSettlementMode,
-        updateUserProfile,
-        establishSession,
-        refreshUser,
-        refreshAccountData: loadAccountCollections,
-        logout,
-        searchQuery,
-        setSearchQuery,
-      }}
-    >
-      {children}
-    </AppContext.Provider>
-  );
+  return <AppContext.Provider value={{
+    user, designs, collections, creators: CREATORS, savedDesignIds, purchases, toasts, authReady,
+    showToast, removeToast, toggleSaveDesign, isSaved: (id) => savedDesignIds.includes(id),
+    isPurchased: (id) => purchases.some((purchase) => purchase.itemId === id), updateUserProfile,
+    establishSession, refreshUser, refreshAccountData: loadAccountCollections, logout, searchQuery, setSearchQuery,
+  }}>{children}</AppContext.Provider>;
 };
 
 export const useApp = () => {
   const context = useContext(AppContext);
-  if (!context) {
-    throw new Error('useApp must be used within an AppProvider');
-  }
+  if (!context) throw new Error('useApp must be used within an AppProvider');
   return context;
 };

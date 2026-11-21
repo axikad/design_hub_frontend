@@ -34,6 +34,16 @@ import type {
   PricingPreview,
   UploadResult,
 } from '../types/studio';
+import type {
+  BalanceBucket,
+  EarningsEnvelope,
+  EarningStatus,
+  SellerWithdrawal,
+  TransactionsEnvelope,
+  WalletSummary,
+  WithdrawalsEnvelope,
+  WithdrawalStatus,
+} from '../types/wallet';
 
 const configuredBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim();
 export const API_BASE_URL = (configuredBaseUrl || 'https://app.designshub.org/api/v1').replace(/\/$/, '');
@@ -223,6 +233,28 @@ export const studioApi = {
     body.append('file', file);
     return apiRequest<FolderEnvelope>('folders', { method: 'POST', body, authenticated: true });
   },
+};
+
+export const walletApi = {
+  summary: (signal?: AbortSignal) =>
+    apiRequest<ApiEnvelope<WalletSummary>>('seller/wallet', { signal, authenticated: true }),
+  earnings: (query: { page?: number; per_page?: number; status?: EarningStatus } = {}, signal?: AbortSignal) =>
+    apiRequest<EarningsEnvelope>('seller/earnings', { query, signal, authenticated: true }),
+  transactions: (query: { page?: number; per_page?: number; balanceBucket?: BalanceBucket } = {}, signal?: AbortSignal) =>
+    apiRequest<TransactionsEnvelope>('seller/transactions', { query, signal, authenticated: true }),
+  withdrawals: (query: { page?: number; per_page?: number; status?: WithdrawalStatus } = {}, signal?: AbortSignal) =>
+    apiRequest<WithdrawalsEnvelope>('seller/withdrawals', { query, signal, authenticated: true }),
+  requestWithdrawal: (amountPaise: number, idempotencyKey: string) =>
+    apiRequest<ApiEnvelope<SellerWithdrawal>>('seller/withdrawals', {
+      method: 'POST',
+      body: { amountPaise, idempotencyKey },
+      authenticated: true,
+    }),
+  cancelWithdrawal: (id: string) =>
+    apiRequest<ApiEnvelope<SellerWithdrawal>>(`seller/withdrawals/${encodeURIComponent(id)}/cancel`, {
+      method: 'POST',
+      authenticated: true,
+    }),
 };
 
 export const getErrorMessage = (error: unknown) =>

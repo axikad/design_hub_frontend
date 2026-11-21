@@ -1,737 +1,83 @@
-import React, { useState } from 'react';
-import { useSearchParams, Link } from 'react-router-dom';
-import {
-  Wallet,
-  Clock,
-  CheckCircle2,
-  Lock,
-  ArrowUpRight,
-  ArrowDownLeft,
-  Calendar,
-  AlertCircle,
-  Sparkles,
-  Sliders,
-  RotateCcw,
-  ChevronDown,
-  ChevronUp,
-  Info,
-  Building2,
-  TrendingUp,
-  Check
-} from 'lucide-react';
-import { useApp } from '../../context/AppContext';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { AlertCircle, ArrowDownLeft, ArrowUpRight, CalendarClock, CheckCircle2, Clock3, LoaderCircle, LockKeyhole, RefreshCw, Wallet, type LucideIcon } from 'lucide-react';
 import { ConfirmationDialog } from '../../components/common/ConfirmationDialog';
+import { ApiError, getErrorMessage, walletApi } from '../../lib/api-client';
+import type { PaginationMeta } from '../../types/marketplace';
+import type { BalanceBucket, EarningStatus, SellerEarning, SellerTransaction, SellerWithdrawal, WalletSummary, WithdrawalStatus } from '../../types/wallet';
+import { useApp } from '../../context/AppContext';
+
+type WalletTab = 'earnings' | 'settlements' | 'withdrawals' | 'ledger';
+const tabs: Array<{ id: WalletTab; label: string }> = [
+  { id: 'earnings', label: 'Earnings' }, { id: 'settlements', label: 'Settlement schedule' },
+  { id: 'withdrawals', label: 'Withdrawals' }, { id: 'ledger', label: 'Ledger' },
+];
+const money = (paise: number, currency = 'INR') => new Intl.NumberFormat('en-IN', { style: 'currency', currency, maximumFractionDigits: 2 }).format(paise / 100);
+const dateTime = (value: string | null) => value ? new Intl.DateTimeFormat('en-IN', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value)) : 'Not scheduled';
+const words = (value: string) => value.replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
+const badgeTone = (status: string) => ['paid', 'available'].includes(status) ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : ['failed', 'rejected', 'reversed'].includes(status) ? 'bg-rose-50 text-rose-700 border-rose-200' : ['cancelled', 'refunded'].includes(status) ? 'bg-stone-100 text-stone-600 border-stone-200' : 'bg-amber-50 text-amber-800 border-amber-200';
+const emptyMeta: PaginationMeta = { current_page: 1, per_page: 10, total: 0, last_page: 1, from: null, to: null };
+
+const Pager: React.FC<{ meta: PaginationMeta; onPage: (page: number) => void }> = ({ meta, onPage }) => meta.last_page <= 1 ? null : (
+  <div className="flex items-center justify-between border-t border-stone-100 px-5 py-4 text-xs">
+    <span className="text-stone-500">Showing {meta.from ?? 0}–{meta.to ?? 0} of {meta.total}</span>
+    <div className="flex gap-2"><button type="button" disabled={meta.current_page <= 1} onClick={() => onPage(meta.current_page - 1)} className="rounded-lg border border-stone-200 px-3 py-1.5 font-semibold disabled:opacity-40">Previous</button><button type="button" disabled={meta.current_page >= meta.last_page} onClick={() => onPage(meta.current_page + 1)} className="rounded-lg border border-stone-200 px-3 py-1.5 font-semibold disabled:opacity-40">Next</button></div>
+  </div>
+);
+const LoadingRows = () => <div className="flex min-h-48 items-center justify-center text-sm text-stone-500"><LoaderCircle className="mr-2 h-5 w-5 animate-spin" /> Loading wallet records…</div>;
 
 export const SellerWalletPage: React.FC = () => {
   const [searchParams] = useSearchParams();
-  const initialTab = (searchParams.get('tab') as any) || 'earnings';
+  const requestedTab = searchParams.get('tab') as WalletTab | null;
+  const [activeTab, setActiveTab] = useState<WalletTab>(tabs.some((tab) => tab.id === requestedTab) ? requestedTab! : 'earnings');
+  const { showToast } = useApp();
+  const [summary, setSummary] = useState<WalletSummary | null>(null);
+  const [earnings, setEarnings] = useState<SellerEarning[]>([]);
+  const [withdrawals, setWithdrawals] = useState<SellerWithdrawal[]>([]);
+  const [transactions, setTransactions] = useState<SellerTransaction[]>([]);
+  const [earningMeta, setEarningMeta] = useState(emptyMeta); const [withdrawalMeta, setWithdrawalMeta] = useState(emptyMeta); const [transactionMeta, setTransactionMeta] = useState(emptyMeta);
+  const [earningPage, setEarningPage] = useState(1); const [withdrawalPage, setWithdrawalPage] = useState(1); const [transactionPage, setTransactionPage] = useState(1);
+  const [earningStatus, setEarningStatus] = useState<EarningStatus | ''>(''); const [withdrawalStatus, setWithdrawalStatus] = useState<WithdrawalStatus | ''>(''); const [bucket, setBucket] = useState<BalanceBucket | ''>('');
+  const [loadingSummary, setLoadingSummary] = useState(true); const [loadingEarnings, setLoadingEarnings] = useState(true); const [loadingWithdrawals, setLoadingWithdrawals] = useState(true); const [loadingTransactions, setLoadingTransactions] = useState(true);
+  const [pageError, setPageError] = useState(''); const [reload, setReload] = useState(0); const [amount, setAmount] = useState('');
+  const [confirmWithdrawal, setConfirmWithdrawal] = useState(false); const [cancelTarget, setCancelTarget] = useState<SellerWithdrawal | null>(null); const [submitting, setSubmitting] = useState(false); const [idempotencyKey, setIdempotencyKey] = useState('');
 
-  const {
-    user,
-    wallet,
-    earnings,
-    settlementCycles,
-    withdrawals,
-    ledger,
-    requestWithdrawal,
-    cancelWithdrawal,
-    setSettlementMode,
-    showToast,
-  } = useApp();
+  useEffect(() => { const controller = new AbortController(); setLoadingSummary(true); setPageError(''); walletApi.summary(controller.signal).then((r) => setSummary(r.data)).catch((error) => { if (!(error instanceof DOMException && error.name === 'AbortError')) setPageError(getErrorMessage(error)); }).finally(() => setLoadingSummary(false)); return () => controller.abort(); }, [reload]);
+  useEffect(() => { const controller = new AbortController(); setLoadingEarnings(true); walletApi.earnings({ page: earningPage, per_page: 10, status: earningStatus || undefined }, controller.signal).then((r) => { setEarnings(r.data); setEarningMeta(r.meta); }).catch((error) => { if (!(error instanceof DOMException && error.name === 'AbortError')) showToast('Could not load earnings', getErrorMessage(error), 'error'); }).finally(() => setLoadingEarnings(false)); return () => controller.abort(); }, [earningPage, earningStatus, reload]);
+  useEffect(() => { const controller = new AbortController(); setLoadingWithdrawals(true); walletApi.withdrawals({ page: withdrawalPage, per_page: 10, status: withdrawalStatus || undefined }, controller.signal).then((r) => { setWithdrawals(r.data); setWithdrawalMeta(r.meta); }).catch((error) => { if (!(error instanceof DOMException && error.name === 'AbortError')) showToast('Could not load withdrawals', getErrorMessage(error), 'error'); }).finally(() => setLoadingWithdrawals(false)); return () => controller.abort(); }, [withdrawalPage, withdrawalStatus, reload]);
+  useEffect(() => { const controller = new AbortController(); setLoadingTransactions(true); walletApi.transactions({ page: transactionPage, per_page: 10, balanceBucket: bucket || undefined }, controller.signal).then((r) => { setTransactions(r.data); setTransactionMeta(r.meta); }).catch((error) => { if (!(error instanceof DOMException && error.name === 'AbortError')) showToast('Could not load ledger', getErrorMessage(error), 'error'); }).finally(() => setLoadingTransactions(false)); return () => controller.abort(); }, [transactionPage, bucket, reload]);
+  const refreshAll = useCallback(() => setReload((value) => value + 1), []);
+  const amountPaise = Math.round((Number(amount) || 0) * 100);
+  const openWithdrawalConfirmation = (event: React.FormEvent) => { event.preventDefault(); if (!summary) return; if (amountPaise < summary.minimumWithdrawalPaise) { showToast('Amount is below the minimum', `Enter at least ${money(summary.minimumWithdrawalPaise, summary.currency)}.`, 'error'); return; } if (amountPaise > summary.balances.availablePaise) { showToast('Insufficient available balance', `You can withdraw up to ${money(summary.balances.availablePaise, summary.currency)}.`, 'error'); return; } if (!idempotencyKey) setIdempotencyKey(globalThis.crypto?.randomUUID?.() ?? `web-${Date.now()}-${Math.random().toString(36).slice(2)}`); setConfirmWithdrawal(true); };
+  const submitWithdrawal = async () => { if (!idempotencyKey || submitting) return; setSubmitting(true); try { const response = await walletApi.requestWithdrawal(amountPaise, idempotencyKey); showToast('Withdrawal requested', response.message, 'success'); setAmount(''); setIdempotencyKey(''); setConfirmWithdrawal(false); refreshAll(); setActiveTab('withdrawals'); } catch (error) { const fieldError = error instanceof ApiError && error.errors ? Object.values(error.errors).flat()[0] : undefined; showToast('Withdrawal request failed', fieldError || getErrorMessage(error), 'error'); setConfirmWithdrawal(false); } finally { setSubmitting(false); } };
+  const cancelWithdrawal = async () => { if (!cancelTarget || submitting) return; setSubmitting(true); try { const response = await walletApi.cancelWithdrawal(cancelTarget.id); showToast('Withdrawal cancelled', response.message, 'info'); setCancelTarget(null); refreshAll(); } catch (error) { showToast('Could not cancel withdrawal', getErrorMessage(error), 'error'); } finally { setSubmitting(false); } };
+  const settlementGroups = useMemo(() => { const groups = new Map<string, { label: string; scheduledAt: string | null; timezone: string; items: SellerEarning[] }>(); earnings.forEach((earning) => { const key = `${earning.settlement.scheduledAt ?? 'unscheduled'}|${earning.settlement.label}`; const existing = groups.get(key); if (existing) existing.items.push(earning); else groups.set(key, { label: earning.settlement.label, scheduledAt: earning.settlement.scheduledAt, timezone: earning.settlement.timezone, items: [earning] }); }); return [...groups.values()]; }, [earnings]);
+  const withdrawalDisabledReason = !summary?.payoutsEnabled ? 'Payout requests are currently disabled by the administrator.' : summary.settlementMode === 'automatic' ? 'Your account uses automatic settlement. Manual withdrawal requests are not available.' : summary.hasOpenWithdrawal ? 'You already have an open withdrawal request.' : summary.balances.availablePaise < summary.minimumWithdrawalPaise ? `Available balance must reach ${money(summary.minimumWithdrawalPaise, summary.currency)}.` : '';
+  const balanceCards: Array<[string, number, LucideIcon, string]> = summary ? [
+    ['Pending', summary.balances.pendingPaise, Clock3, 'Waiting for release'],
+    ['Waiting settlement', summary.balances.waitingSettlementPaise, CalendarClock, 'Cycle scheduled'],
+    ['Available', summary.balances.availablePaise, Wallet, 'Ready for payout'],
+    ['Reserved', summary.balances.reservedPaise, LockKeyhole, 'Open withdrawals'],
+    ['Paid', summary.balances.paidPaise, CheckCircle2, 'Completed payouts'],
+  ] : [];
 
-  const [activeTab, setActiveTab] = useState<'earnings' | 'settlements' | 'withdrawals' | 'ledger'>(
-    initialTab
-  );
-
-  // Earnings Filter state
-  const [earningStatusFilter, setEarningStatusFilter] = useState<'all' | 'pending' | 'available'>('all');
-  const [earningCycleFilter, setEarningCycleFilter] = useState<string>('all');
-
-  // Withdrawal form state
-  const [withdrawAmount, setWithdrawAmount] = useState<number>(10000);
-  const [selectedBank, setSelectedBank] = useState(user.bankAccount);
-  const [withdrawConfirmOpen, setWithdrawConfirmOpen] = useState(false);
-  const [expandedLedgerId, setExpandedLedgerId] = useState<string | null>(null);
-
-  // Settlement Mode Switcher
-  const handleModeChange = (mode: 'manual' | 'automatic') => {
-    setSettlementMode(mode);
-  };
-
-  const handleWithdrawalSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (withdrawAmount < 1000) {
-      showToast('Minimum Withdrawal ₹1,000', 'Please enter at least ₹1,000.', 'error');
-      return;
-    }
-    if (withdrawAmount > wallet.available) {
-      showToast('Insufficient Balance', 'Requested amount exceeds your available balance.', 'error');
-      return;
-    }
-    setWithdrawConfirmOpen(true);
-  };
-
-  const handleConfirmWithdrawal = () => {
-    setWithdrawConfirmOpen(false);
-    requestWithdrawal(withdrawAmount, selectedBank);
-  };
-
-  const filteredEarnings = earnings.filter((e) => {
-    if (earningStatusFilter !== 'all' && e.status !== earningStatusFilter) return false;
-    if (earningCycleFilter !== 'all' && !e.settlementCycle.includes(earningCycleFilter)) return false;
-    return true;
-  });
-
-  return (
-    <div className="min-h-screen bg-[#FAF8F5] pb-24">
-      {/* Withdrawal Confirmation Dialog */}
-      <ConfirmationDialog
-        isOpen={withdrawConfirmOpen}
-        title="Confirm Bank Payout Request"
-        message={`Are you sure you want to request a payout of ₹${withdrawAmount.toLocaleString('en-IN')} to ${selectedBank}? This amount will be moved from Available to Reserved.`}
-        confirmLabel="Confirm & Reserve Amount"
-        onCancel={() => setWithdrawConfirmOpen(false)}
-        onConfirm={handleConfirmWithdrawal}
-      />
-
-      {/* Top Header */}
-      <div className="bg-white border-b border-stone-200 py-8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-            <div>
-              <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-amber-900 mb-1">
-                <span>Creator Financial Center</span>
-                <span aria-hidden="true">·</span>
-                <span>Settlement schedule preview</span>
-              </div>
-              <h1 className="font-serif text-2xl sm:text-3xl font-bold text-stone-900">
-                Seller Wallet & Settlements
-              </h1>
-            </div>
-
-            {/* Settlement Mode Switcher */}
-            <div className="flex items-center gap-3 bg-stone-100 p-1.5 rounded-xl border border-stone-200 text-xs">
-              <span className="font-medium text-stone-600 pl-2">Payout Mode:</span>
-              <button
-                type="button"
-                onClick={() => handleModeChange('manual')}
-                className={`px-3 py-1.5 rounded-lg font-semibold transition-all ${
-                  wallet.settlementMode === 'manual'
-                    ? 'bg-white text-stone-900 shadow-xs'
-                    : 'text-stone-500 hover:text-stone-900'
-                }`}
-              >
-                Manual Requests
-              </button>
-              <button
-                type="button"
-                onClick={() => handleModeChange('automatic')}
-                className={`px-3 py-1.5 rounded-lg font-semibold transition-all ${
-                  wallet.settlementMode === 'automatic'
-                    ? 'bg-white text-stone-900 shadow-xs'
-                    : 'text-stone-500 hover:text-stone-900'
-                }`}
-              >
-                Automatic Bank Transfer
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-8">
-        
-        {/* Test Mode & Settlement Explanation Banner */}
-        <div className="p-4 bg-amber-50/90 rounded-2xl border border-amber-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs text-amber-950">
-          <div className="flex items-start gap-3">
-            <Sparkles className="w-5 h-5 text-amber-700 shrink-0 mt-0.5" />
-            <div>
-              <strong className="block font-semibold">
-                Transparent Settlement Cycle Policy (Test Sandbox Active)
-              </strong>
-              <p className="text-amber-900/80 mt-0.5 leading-relaxed">
-                “Your earning is recorded after purchase, waits until the configured settlement date, and then becomes available or is automatically processed based on your settlement mode.”
-              </p>
-            </div>
-          </div>
-          <div className="shrink-0 flex items-center gap-2">
-            <span className="font-mono text-[11px] bg-amber-200/80 px-2.5 py-1 rounded-md font-bold">
-              Next Payout: {wallet.nextSettlementDate}
-            </span>
-          </div>
-        </div>
-
-        {/* 4 Balance Cards per prompt: Pending, Available, Reserved, Paid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          
-          {/* Card 1: Pending */}
-          <div className="bg-white p-5 rounded-2xl border border-stone-200/90 shadow-xs space-y-2">
-            <div className="flex items-center justify-between text-xs text-stone-500">
-              <span className="uppercase tracking-wider font-medium text-[10px]">1. Pending Balance</span>
-              <span className="p-1 rounded-md bg-amber-50 text-amber-700">
-                <Clock className="w-4 h-4" />
-              </span>
-            </div>
-            <div className="text-2xl font-bold font-mono tabular-nums text-stone-900">
-              ₹{wallet.pending.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-            </div>
-            <p className="text-[11px] text-stone-500 pt-1 border-t border-stone-100">
-              Waiting for Cycle #49 release on Nov 12
-            </p>
-          </div>
-
-          {/* Card 2: Available */}
-          <div className="bg-white p-5 rounded-2xl border border-stone-200/90 shadow-xs space-y-2 ring-1 ring-emerald-500/20">
-            <div className="flex items-center justify-between text-xs text-stone-500">
-              <span className="uppercase tracking-wider font-medium text-[10px]">2. Available Balance</span>
-              <span className="p-1 rounded-md bg-emerald-50 text-emerald-700">
-                <CheckCircle2 className="w-4 h-4" />
-              </span>
-            </div>
-            <div className="text-2xl font-bold font-mono tabular-nums text-emerald-900">
-              ₹{wallet.available.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-            </div>
-            <p className="text-[11px] text-stone-500 pt-1 border-t border-stone-100 flex items-center justify-between">
-              <span>Ready for withdrawal</span>
-              {wallet.settlementMode === 'manual' && (
-                <button
-                  onClick={() => setActiveTab('withdrawals')}
-                  className="font-bold text-amber-900 hover:underline"
-                >
-                  Request Payout →
-                </button>
-              )}
-            </p>
-          </div>
-
-          {/* Card 3: Reserved */}
-          <div className="bg-white p-5 rounded-2xl border border-stone-200/90 shadow-xs space-y-2">
-            <div className="flex items-center justify-between text-xs text-stone-500">
-              <span className="uppercase tracking-wider font-medium text-[10px]">3. Reserved Balance</span>
-              <span className="p-1 rounded-md bg-stone-100 text-stone-700">
-                <Lock className="w-4 h-4" />
-              </span>
-            </div>
-            <div className="text-2xl font-bold font-mono tabular-nums text-stone-900">
-              ₹{wallet.reserved.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-            </div>
-            <p className="text-[11px] text-stone-500 pt-1 border-t border-stone-100">
-              Under payout bank processing
-            </p>
-          </div>
-
-          {/* Card 4: Paid */}
-          <div className="bg-white p-5 rounded-2xl border border-stone-200/90 shadow-xs space-y-2">
-            <div className="flex items-center justify-between text-xs text-stone-500">
-              <span className="uppercase tracking-wider font-medium text-[10px]">4. Total Paid Out</span>
-              <span className="p-1 rounded-md bg-stone-100 text-stone-700">
-                <Building2 className="w-4 h-4" />
-              </span>
-            </div>
-            <div className="text-2xl font-bold font-mono tabular-nums text-stone-900">
-              ₹{wallet.paid.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-            </div>
-            <p className="text-[11px] text-stone-500 pt-1 border-t border-stone-100">
-              Completed bank transfers
-            </p>
-          </div>
-
-        </div>
-
-        {/* 4 Wallet Tabs per prompt: Earnings, Settlements/Payouts, Withdrawals, Ledger */}
-        <div className="bg-white rounded-2xl border border-stone-200/90 p-6 space-y-6">
-          
-          {/* Tab Navigation Controls */}
-          <div className="flex bg-stone-100 p-1.5 rounded-xl text-xs font-semibold overflow-x-auto">
-            <button
-              onClick={() => setActiveTab('earnings')}
-              className={`px-5 py-2.5 rounded-lg whitespace-nowrap transition-all ${
-                activeTab === 'earnings'
-                  ? 'bg-white text-stone-900 shadow-xs'
-                  : 'text-stone-600 hover:text-stone-900'
-              }`}
-            >
-              1. Earnings Breakdown ({earnings.length})
-            </button>
-            <button
-              onClick={() => setActiveTab('settlements')}
-              className={`px-5 py-2.5 rounded-lg whitespace-nowrap transition-all ${
-                activeTab === 'settlements'
-                  ? 'bg-white text-stone-900 shadow-xs'
-                  : 'text-stone-600 hover:text-stone-900'
-              }`}
-            >
-              2. Settlement Timeline & Cycles
-            </button>
-            <button
-              onClick={() => setActiveTab('withdrawals')}
-              className={`px-5 py-2.5 rounded-lg whitespace-nowrap transition-all ${
-                activeTab === 'withdrawals'
-                  ? 'bg-white text-stone-900 shadow-xs'
-                  : 'text-stone-600 hover:text-stone-900'
-              }`}
-            >
-              3. Bank Payouts / Withdrawals
-            </button>
-            <button
-              onClick={() => setActiveTab('ledger')}
-              className={`px-5 py-2.5 rounded-lg whitespace-nowrap transition-all ${
-                activeTab === 'ledger'
-                  ? 'bg-white text-stone-900 shadow-xs'
-                  : 'text-stone-600 hover:text-stone-900'
-              }`}
-            >
-              4. Human-Readable Ledger ({ledger.length})
-            </button>
-          </div>
-
-          {/* TAB 1: EARNINGS UI */}
-          {activeTab === 'earnings' && (
-            <div className="space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2">
-                <div>
-                  <h3 className="font-serif text-base font-bold text-stone-900">
-                    Product Sales & Royalty Ledger
-                  </h3>
-                  <p className="text-xs text-stone-500">
-                    Showing the buyer amount, server-recorded commission snapshot and seller net earning.
-                  </p>
-                </div>
-
-                {/* Filters for Status & Settlement Cycle */}
-                <div className="flex items-center gap-2 text-xs">
-                  <select
-                    value={earningStatusFilter}
-                    onChange={(e) => setEarningStatusFilter(e.target.value as any)}
-                    className="p-2 bg-stone-50 border border-stone-200 rounded-lg text-stone-800"
-                  >
-                    <option value="all">All Statuses</option>
-                    <option value="pending">Pending</option>
-                    <option value="available">Available</option>
-                  </select>
-
-                  <select
-                    value={earningCycleFilter}
-                    onChange={(e) => setEarningCycleFilter(e.target.value)}
-                    className="p-2 bg-stone-50 border border-stone-200 rounded-lg text-stone-800"
-                  >
-                    <option value="all">All Cycles</option>
-                    <option value="49">Cycle #49</option>
-                    <option value="48">Cycle #48</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-stone-50 border-y border-stone-200 text-stone-500 uppercase tracking-wider font-semibold">
-                    <tr>
-                      <th className="py-3 px-4">Design Item</th>
-                      <th className="py-3 px-4">Buyer Paid</th>
-                      <th className="py-3 px-4">Commission</th>
-                      <th className="py-3 px-4">Seller Net</th>
-                      <th className="py-3 px-4">Status</th>
-                      <th className="py-3 px-4">Cycle / Scheduled</th>
-                      <th className="py-3 px-4">Environment</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-stone-100">
-                    {filteredEarnings.map((record) => (
-                      <tr key={record.id} className="hover:bg-stone-50/50">
-                        <td className="py-3 px-4">
-                          <div className="flex items-center gap-3">
-                            <img
-                              src={record.image}
-                              alt={record.designName}
-                              className="w-10 h-10 rounded-lg object-cover border border-stone-200"
-                            />
-                            <div>
-                              <h5 className="font-serif font-bold text-stone-900 truncate max-w-xs">
-                                {record.designName}
-                              </h5>
-                              <span className="text-[10px] text-stone-400 font-mono">
-                                {record.saleDate}
-                              </span>
-                            </div>
-                          </div>
-                        </td>
-
-                        <td className="py-3 px-4 font-mono font-medium text-stone-900">
-                          ₹{record.buyerPaid.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                        </td>
-
-                        <td className="py-3 px-4 font-mono text-stone-500">
-                          -₹{record.commission.toFixed(2)}
-                        </td>
-
-                        <td className="py-3 px-4 font-mono font-bold text-emerald-800">
-                          +₹{record.netEarning.toFixed(2)}
-                        </td>
-
-                        <td className="py-3 px-4">
-                          <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${
-                            record.status === 'available'
-                              ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
-                              : 'bg-amber-50 text-amber-800 border border-amber-200'
-                          }`}>
-                            {record.status}
-                          </span>
-                        </td>
-
-                        <td className="py-3 px-4 text-stone-600">
-                          <div>{record.settlementCycle}</div>
-                          <span className="text-[10px] text-stone-400 font-mono">
-                            Release: {record.scheduledSettlementDate}
-                          </span>
-                        </td>
-
-                        <td className="py-3 px-4">
-                          <span className="font-mono text-[10px] bg-stone-100 text-stone-600 px-2 py-0.5 rounded">
-                            {record.environment}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
-          {/* TAB 2: SETTLEMENT UI */}
-          {activeTab === 'settlements' && (
-            <div className="space-y-8">
-              <div>
-                <h3 className="font-serif text-base font-bold text-stone-900">
-                  Settlement Timeline & Active Cycles
-                </h3>
-                <p className="text-xs text-stone-500">
-                  Track when your sales transition from waiting periods to available cash balances.
-                </p>
-              </div>
-
-              {/* Visual Settlement Cycles Timeline */}
-              <div className="space-y-6">
-                {settlementCycles.map((cycle, idx) => {
-                  const isCurrent = cycle.status === 'upcoming';
-                  const isProcessing = cycle.status === 'processing';
-                  return (
-                    <div
-                      key={cycle.id}
-                      className={`p-6 rounded-2xl border transition-all ${
-                        isCurrent
-                          ? 'border-amber-300 bg-amber-50/30'
-                          : isProcessing
-                          ? 'border-emerald-300 bg-emerald-50/20'
-                          : 'border-stone-200 bg-white'
-                      }`}
-                    >
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-stone-200/80">
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${
-                              isCurrent
-                                ? 'bg-amber-100 text-amber-900'
-                                : isProcessing
-                                ? 'bg-emerald-100 text-emerald-900'
-                                : 'bg-stone-100 text-stone-600'
-                            }`}>
-                              {cycle.status}
-                            </span>
-                            <h4 className="font-serif text-base font-bold text-stone-900">
-                              {cycle.cyclePeriod}
-                            </h4>
-                          </div>
-                          <p className="text-xs text-stone-500 mt-1">
-                            Sales window: {cycle.startDay} to {cycle.endDay} · Scheduled Payout: <strong>{cycle.settlementDate}</strong>
-                          </p>
-                        </div>
-
-                        <div className="flex items-center gap-4 text-xs font-mono">
-                          <div>
-                            <span className="text-stone-400 block text-[10px] uppercase">Sales</span>
-                            <span className="font-bold text-stone-900">{cycle.salesCount} sale records</span>
-                          </div>
-                          <div>
-                            <span className="text-stone-400 block text-[10px] uppercase">Amount</span>
-                            <span className="font-bold text-stone-900">
-                              ₹{(cycle.waitingAmount || cycle.releasedAmount || cycle.paidAmount).toLocaleString('en-IN')}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Progress Timeline Graphic */}
-                      <div className="mt-4 pt-2">
-                        <div className="flex items-center justify-between text-xs font-medium text-stone-600 mb-2">
-                          <span className="flex items-center gap-1.5">
-                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-700" />
-                            1. Purchases Recorded
-                          </span>
-                          <span className="flex items-center gap-1.5">
-                            <Clock className={`w-3.5 h-3.5 ${isCurrent ? 'text-amber-700' : 'text-emerald-700'}`} />
-                            2. Cycle Window ({cycle.startDay}–{cycle.endDay})
-                          </span>
-                          <span className="flex items-center gap-1.5">
-                            <Building2 className={`w-3.5 h-3.5 ${cycle.status === 'completed' ? 'text-emerald-700' : 'text-stone-400'}`} />
-                            3. Settlement Released ({cycle.settlementDate})
-                          </span>
-                        </div>
-
-                        <div className="w-full bg-stone-200 h-2 rounded-full overflow-hidden">
-                          <div
-                            className={`h-full transition-all duration-500 ${
-                              cycle.status === 'completed'
-                                ? 'w-full bg-emerald-600'
-                                : cycle.status === 'processing'
-                                ? 'w-3/4 bg-emerald-500'
-                                : 'w-1/3 bg-amber-500'
-                            }`}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Explanatory rules for digitizers */}
-              <div className="p-5 bg-stone-50 rounded-xl border border-stone-200 text-xs text-stone-600 space-y-2">
-                <h4 className="font-semibold text-stone-900">How the Settlement Engine Operates:</h4>
-                <ul className="list-disc list-inside space-y-1 text-stone-500">
-                  <li>Sales from Days 1–4 are aggregated and released on Day 6.</li>
-                  <li>Sales from Days 5–10 are aggregated and released on Day 12.</li>
-                  <li>In <strong>Automatic Mode</strong>, released balances are automatically transferred to your designated bank account via NEFT/IMPS.</li>
-                  <li>In <strong>Manual Mode</strong>, balances enter Available status, allowing you to withdraw customized sums on demand.</li>
-                </ul>
-              </div>
-            </div>
-          )}
-
-          {/* TAB 3: WITHDRAWALS UI */}
-          {activeTab === 'withdrawals' && (
-            <div className="space-y-8">
-              
-              {/* Show based on user.settlementMode */}
-              {wallet.settlementMode === 'manual' ? (
-                /* Manual Settlement Mode View */
-                <div className="p-6 bg-stone-50 rounded-2xl border border-stone-200 space-y-6">
-                  <div>
-                    <h3 className="font-serif text-base font-bold text-stone-900">
-                      Request Manual Bank Withdrawal
-                    </h3>
-                    <p className="text-xs text-stone-500">
-                      Request a payout when the server reports that withdrawals are available for your account.
-                    </p>
-                  </div>
-
-                  <form onSubmit={handleWithdrawalSubmit} className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end text-xs">
-                    <div className="space-y-1 sm:col-span-1">
-                      <label className="font-semibold text-stone-700 block">
-                        Withdrawal Sum (Min. ₹1,000)
-                      </label>
-                      <div className="relative">
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 font-mono font-bold text-stone-500">
-                          ₹
-                        </span>
-                        <input
-                          type="number"
-                          min="1000"
-                          max={wallet.available}
-                          step="500"
-                          value={withdrawAmount}
-                          onChange={(e) => setWithdrawAmount(Number(e.target.value))}
-                          className="w-full pl-7 pr-3 py-2.5 bg-white border border-stone-300 rounded-lg text-stone-900 font-mono font-bold text-sm focus:outline-none focus:ring-1 focus:ring-amber-700"
-                        />
-                      </div>
-                      <span className="text-[10px] text-stone-500 font-mono">
-                        Available: ₹{wallet.available.toLocaleString('en-IN')}
-                      </span>
-                    </div>
-
-                    <div className="space-y-1 sm:col-span-1">
-                      <label className="font-semibold text-stone-700 block">Destination Bank Account</label>
-                      <select
-                        value={selectedBank}
-                        onChange={(e) => setSelectedBank(e.target.value)}
-                        className="w-full p-2.5 bg-white border border-stone-300 rounded-lg text-stone-800"
-                      >
-                        <option value={user.bankAccount}>{user.bankAccount}</option>
-                        <option value="State Bank of India ending in 9931">SBI ending in 9931</option>
-                      </select>
-                      <span className="text-[10px] text-stone-500">NEFT / IMPS 24x7</span>
-                    </div>
-
-                    <div className="sm:col-span-1">
-                      <button
-                        type="submit"
-                        className="w-full py-2.5 bg-stone-900 hover:bg-stone-800 text-white font-semibold rounded-lg text-xs flex items-center justify-center gap-1.5 shadow-sm transition-colors"
-                      >
-                        <ArrowUpRight className="w-4 h-4" />
-                        Request Withdrawal
-                      </button>
-                    </div>
-                  </form>
-                </div>
-              ) : (
-                /* Automatic Mode View */
-                <div className="p-6 bg-emerald-50/60 rounded-2xl border border-emerald-200 space-y-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center">
-                      <Check className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <h3 className="font-serif text-base font-bold text-stone-900">
-                        Automatic Bank Settlements Active
-                      </h3>
-                      <p className="text-xs text-stone-600">
-                        Manual withdrawal forms are disabled because your account is configured for automatic payouts.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs pt-2">
-                    <div className="p-3 bg-white rounded-xl border border-emerald-200/80">
-                      <span className="text-stone-400 block text-[10px] uppercase">Next Scheduled Auto Payout</span>
-                      <span className="font-mono font-bold text-stone-900 text-sm">{wallet.nextSettlementDate}</span>
-                    </div>
-                    <div className="p-3 bg-white rounded-xl border border-emerald-200/80">
-                      <span className="text-stone-400 block text-[10px] uppercase">Destination Bank</span>
-                      <span className="font-medium text-stone-900">{user.bankAccount}</span>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Withdrawal History & Status Timeline */}
-              <div className="space-y-4">
-                <h4 className="font-serif text-base font-bold text-stone-900">
-                  Withdrawal & Payout History
-                </h4>
-
-                <div className="divide-y divide-stone-100 border border-stone-200 rounded-xl overflow-hidden bg-white">
-                  {withdrawals.map((wdr) => (
-                    <div key={wdr.id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2 text-xs">
-                          <span className="font-mono font-bold text-stone-900 text-sm">
-                            ₹{wdr.amount.toLocaleString('en-IN')}
-                          </span>
-                          <span>·</span>
-                          <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${
-                            wdr.status === 'Paid'
-                              ? 'bg-emerald-50 text-emerald-800'
-                              : wdr.status === 'Processing'
-                              ? 'bg-blue-50 text-blue-800'
-                              : wdr.status === 'Requested'
-                              ? 'bg-amber-50 text-amber-800'
-                              : 'bg-stone-100 text-stone-600'
-                          }`}>
-                            {wdr.status}
-                          </span>
-                        </div>
-                        <p className="text-[11px] text-stone-500">
-                          {wdr.date} · {wdr.bankAccount} · Ref: <span className="font-mono">{wdr.referenceId}</span>
-                        </p>
-                      </div>
-
-                      <div className="flex items-center gap-3">
-                        {wdr.canCancel && (
-                          <button
-                            onClick={() => cancelWithdrawal(wdr.id)}
-                            className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-semibold rounded-lg transition-colors"
-                          >
-                            Cancel Request
-                          </button>
-                        )}
-                        <span className="text-xs text-stone-400 font-mono">
-                          {wdr.status === 'Paid' ? 'Transferred' : 'In Progress'}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-            </div>
-          )}
-
-          {/* TAB 4: HUMAN-READABLE LEDGER UI */}
-          {activeTab === 'ledger' && (
-            <div className="space-y-4">
-              <div>
-                <h3 className="font-serif text-base font-bold text-stone-900">
-                  Transaction & Audit Ledger
-                </h3>
-                <p className="text-xs text-stone-500">
-                  Every credit and debit converted into friendly human language with balance bucket tags.
-                </p>
-              </div>
-
-              <div className="space-y-3">
-                {ledger.map((item) => {
-                  const isCredit = item.type === 'credit';
-                  const isExpanded = expandedLedgerId === item.id;
-
-                  return (
-                    <div
-                      key={item.id}
-                      className="p-4 rounded-xl border border-stone-200 bg-white hover:border-stone-300 transition-all space-y-2"
-                    >
-                      <div className="flex items-center justify-between gap-4">
-                        <div className="flex items-center gap-3">
-                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
-                            isCredit ? 'bg-emerald-50 text-emerald-800' : 'bg-rose-50 text-rose-700'
-                          }`}>
-                            {isCredit ? <ArrowDownLeft className="w-4 h-4" /> : <ArrowUpRight className="w-4 h-4" />}
-                          </div>
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <h5 className="font-semibold text-xs text-stone-900">
-                                {item.label}
-                              </h5>
-                              <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-stone-100 text-stone-600">
-                                {item.bucket} Bucket
-                              </span>
-                            </div>
-                            <p className="text-[11px] text-stone-500">{item.itemRef} · {item.dateTime}</p>
-                          </div>
-                        </div>
-
-                        <div className="text-right shrink-0">
-                          <div className={`font-mono font-bold text-sm tabular-nums ${
-                            isCredit ? 'text-emerald-800' : 'text-stone-900'
-                          }`}>
-                            {isCredit ? '+' : '-'}₹{item.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                          </div>
-                          <button
-                            onClick={() => setExpandedLedgerId(isExpanded ? null : item.id)}
-                            className="text-[10px] text-stone-400 hover:text-stone-700 font-mono inline-flex items-center gap-0.5"
-                          >
-                            <span>Details</span>
-                            {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Expandable technical details */}
-                      {isExpanded && (
-                        <div className="pt-2 border-t border-stone-100 text-[10px] text-stone-500 font-mono space-y-1 bg-stone-50 p-2.5 rounded-lg">
-                          <div>Audit Reference ID: {item.id}</div>
-                          <div>Backend Operation Code: <code className="text-amber-800">{item.rawCode}</code></div>
-                          <div>State Ledger Anchor: Immutable Double-Entry Timestamp Hash</div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-        </div>
-
-      </div>
-    </div>
-  );
+  return <div className="min-h-screen bg-[#FAF8F5] pb-24">
+    <ConfirmationDialog isOpen={confirmWithdrawal} title="Confirm withdrawal request" message={`Request ${money(amountPaise, summary?.currency)}? The amount moves from Available to Reserved while it is reviewed.${summary?.isTestMode ? ' This is test mode; no real money will be transferred.' : ''}`} confirmLabel={submitting ? 'Submitting…' : 'Confirm request'} onCancel={() => !submitting && setConfirmWithdrawal(false)} onConfirm={() => void submitWithdrawal()} />
+    <ConfirmationDialog isOpen={Boolean(cancelTarget)} title="Cancel withdrawal request" message={`Cancel ${money(cancelTarget?.amountPaise ?? 0, cancelTarget?.currency)}? Reserved funds will return to your Available balance.`} confirmLabel={submitting ? 'Cancelling…' : 'Cancel withdrawal'} isDestructive onCancel={() => !submitting && setCancelTarget(null)} onConfirm={() => void cancelWithdrawal()} />
+    <header className="border-b border-stone-200 bg-white"><div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-8 sm:px-6 md:flex-row md:items-end md:justify-between lg:px-8"><div><p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-800">Creator financial centre</p><h1 className="mt-1 font-serif text-3xl font-bold text-stone-950">Wallet & settlements</h1><p className="mt-1 text-sm text-stone-500">Live balances, immutable settlement schedules and payout activity.</p></div><div className="flex items-center gap-2">{summary && <span className="rounded-full border border-stone-200 bg-stone-50 px-3 py-1.5 text-xs font-semibold text-stone-700">{summary.settlementMode === 'automatic' ? 'Automatic settlement' : 'Manual withdrawals'}</span>}<button type="button" onClick={refreshAll} className="inline-flex items-center gap-2 rounded-lg border border-stone-200 bg-white px-3 py-2 text-xs font-semibold text-stone-700 hover:bg-stone-50"><RefreshCw className="h-3.5 w-3.5" /> Refresh</button></div></div></header>
+    <main className="mx-auto max-w-7xl space-y-6 px-4 py-7 sm:px-6 lg:px-8">
+      {summary?.isTestMode && <div className="flex gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /><div><strong>Test mode:</strong> balances and payout transitions are simulated. No real money will be transferred.</div></div>}
+      {pageError && <div className="flex items-center justify-between gap-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800"><span>{pageError}</span><button type="button" onClick={refreshAll} className="font-semibold underline">Try again</button></div>}
+      {loadingSummary ? <div className="h-28 animate-pulse rounded-2xl bg-stone-200" /> : summary && <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">{balanceCards.map(([label, value, Icon, help]) => <article key={label} className="rounded-2xl border border-stone-200 bg-white p-4 shadow-xs"><div className="flex items-center justify-between"><span className="text-xs font-semibold text-stone-500">{label}</span><Icon className="h-4 w-4 text-amber-800" /></div><p className="mt-3 text-xl font-bold text-stone-950">{money(value, summary.currency)}</p><p className="mt-1 text-[11px] text-stone-400">{help}</p></article>)}</section>}
+      {summary && <section className="grid gap-4 lg:grid-cols-[1.4fr_1fr]"><div className="rounded-2xl border border-stone-200 bg-white p-5"><div className="flex items-start justify-between gap-4"><div><h2 className="font-serif text-lg font-bold text-stone-950">Payout schedule</h2><p className="mt-1 text-xs text-stone-500">Settlement mode is managed by your marketplace administrator.</p></div><span className="rounded-lg bg-stone-100 px-2.5 py-1 text-xs font-semibold capitalize text-stone-700">{summary.settlementMode}</span></div><div className="mt-4 grid gap-3 sm:grid-cols-2"><div className="rounded-xl bg-stone-50 p-3"><p className="text-[11px] font-semibold uppercase tracking-wide text-stone-400">Next earning release</p><p className="mt-1 text-sm font-semibold text-stone-800">{dateTime(summary.nextReleaseAt)}</p></div><div className="rounded-xl bg-stone-50 p-3"><p className="text-[11px] font-semibold uppercase tracking-wide text-stone-400">Next settlement</p><p className="mt-1 text-sm font-semibold text-stone-800">{dateTime(summary.nextSettlementAt)}</p></div></div></div>
+        <form onSubmit={openWithdrawalConfirmation} className="rounded-2xl border border-stone-200 bg-white p-5"><h2 className="font-serif text-lg font-bold text-stone-950">Request withdrawal</h2><p className="mt-1 text-xs text-stone-500">Minimum {money(summary.minimumWithdrawalPaise, summary.currency)}</p>{withdrawalDisabledReason ? <p className="mt-4 rounded-lg bg-stone-100 p-3 text-xs leading-5 text-stone-600">{withdrawalDisabledReason}</p> : <div className="mt-4 flex gap-2"><label className="flex flex-1 items-center rounded-lg border border-stone-300 bg-white px-3"><span className="text-sm text-stone-500">₹</span><input value={amount} onChange={(event) => { setAmount(event.target.value.replace(/[^0-9.]/g, '')); setIdempotencyKey(''); }} inputMode="decimal" placeholder="Amount" className="w-full bg-transparent px-2 py-2.5 text-sm font-semibold outline-none" /></label><button type="submit" disabled={!summary.canWithdraw || !amount} className="rounded-lg bg-stone-950 px-4 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40">Request</button></div>}</form></section>}
+      <section className="overflow-hidden rounded-2xl border border-stone-200 bg-white"><div className="overflow-x-auto border-b border-stone-200 px-3 pt-3"><div className="flex min-w-max gap-1">{tabs.map((tab) => <button key={tab.id} type="button" onClick={() => setActiveTab(tab.id)} className={`rounded-t-lg px-4 py-3 text-xs font-semibold ${activeTab === tab.id ? 'bg-stone-950 text-white' : 'text-stone-500 hover:bg-stone-50'}`}>{tab.label}</button>)}</div></div>
+        {(activeTab === 'earnings' || activeTab === 'settlements') && <><div className="flex flex-wrap items-center justify-between gap-3 border-b border-stone-100 px-5 py-4"><div><h2 className="font-serif text-lg font-bold text-stone-950">{activeTab === 'earnings' ? 'Sale earnings' : 'Settlement schedule'}</h2><p className="text-xs text-stone-500">Each sale keeps the schedule captured when the buyer paid.</p></div><select value={earningStatus} onChange={(event) => { setEarningStatus(event.target.value as EarningStatus | ''); setEarningPage(1); }} className="rounded-lg border border-stone-200 bg-white px-3 py-2 text-xs"><option value="">All statuses</option>{['pending', 'available', 'reserved', 'paid', 'refunded', 'reversed', 'held'].map((status) => <option key={status} value={status}>{words(status)}</option>)}</select></div>
+          {loadingEarnings ? <LoadingRows /> : earnings.length === 0 ? <div className="p-12 text-center text-sm text-stone-500">No earnings found.</div> : activeTab === 'earnings' ? <div className="divide-y divide-stone-100">{earnings.map((earning) => <article key={earning.id} className="grid gap-4 px-5 py-4 text-xs md:grid-cols-[1.5fr_1fr_1fr_1.3fr_auto] md:items-center"><div><p className="font-semibold text-stone-900">{earning.item.name}</p><p className="mt-1 text-stone-400">{dateTime(earning.createdAt)}</p></div><div><p className="text-stone-400">Buyer paid</p><p className="font-semibold text-stone-800">{money(earning.buyerPaidPaise, earning.currency)}</p></div><div><p className="text-stone-400">Commission</p><p className="font-semibold text-rose-600">−{money(earning.commissionPaise, earning.currency)}</p></div><div><p className="font-semibold text-emerald-700">Net {money(earning.sellerNetPaise, earning.currency)}</p><p className="mt-1 text-stone-400">{earning.settlement.label}</p></div><span className={`w-fit rounded-full border px-2.5 py-1 font-semibold ${badgeTone(earning.status)}`}>{words(earning.status)}</span></article>)}</div> : <div className="grid gap-4 p-5 lg:grid-cols-2">{settlementGroups.map((group) => { const total = group.items.reduce((sum, item) => sum + item.sellerNetPaise, 0); return <article key={`${group.scheduledAt}-${group.label}`} className="rounded-xl border border-stone-200 p-4"><div className="flex items-start justify-between gap-3"><div><p className="font-semibold text-stone-900">{group.label}</p><p className="mt-1 text-xs text-stone-500">{dateTime(group.scheduledAt)} · {group.timezone}</p></div><span className="text-sm font-bold text-emerald-700">{money(total, group.items[0]?.currency)}</span></div><p className="mt-4 text-xs text-stone-500">{group.items.length} earning{group.items.length === 1 ? '' : 's'} in this schedule</p></article>; })}</div>}<Pager meta={earningMeta} onPage={setEarningPage} /></>}
+        {activeTab === 'withdrawals' && <><div className="flex flex-wrap items-center justify-between gap-3 border-b border-stone-100 px-5 py-4"><div><h2 className="font-serif text-lg font-bold text-stone-950">Withdrawal history</h2><p className="text-xs text-stone-500">Seller requests and automatic settlements from the server.</p></div><select value={withdrawalStatus} onChange={(event) => { setWithdrawalStatus(event.target.value as WithdrawalStatus | ''); setWithdrawalPage(1); }} className="rounded-lg border border-stone-200 px-3 py-2 text-xs"><option value="">All statuses</option>{['requested', 'approved', 'processing', 'paid', 'rejected', 'cancelled', 'failed'].map((status) => <option key={status} value={status}>{words(status)}</option>)}</select></div>{loadingWithdrawals ? <LoadingRows /> : withdrawals.length === 0 ? <div className="p-12 text-center text-sm text-stone-500">No withdrawals yet.</div> : <div className="divide-y divide-stone-100">{withdrawals.map((withdrawal) => <article key={withdrawal.id} className="grid gap-4 px-5 py-4 text-xs md:grid-cols-[1.5fr_1fr_1fr_auto_auto] md:items-center"><div><p className="font-mono font-semibold text-stone-800">{withdrawal.id}</p><p className="mt-1 text-stone-400">{dateTime(withdrawal.requestedAt)}</p></div><div><p className="text-stone-400">Net transfer</p><p className="font-bold text-stone-900">{money(withdrawal.netTransferPaise, withdrawal.currency)}</p></div><div><p className="text-stone-400">Source</p><p className="font-semibold capitalize text-stone-700">{withdrawal.requestSource}</p></div><span className={`w-fit rounded-full border px-2.5 py-1 font-semibold ${badgeTone(withdrawal.status)}`}>{words(withdrawal.status)}</span>{withdrawal.canCancel ? <button type="button" onClick={() => setCancelTarget(withdrawal)} className="w-fit font-semibold text-rose-600 hover:underline">Cancel</button> : <span />}</article>)}</div>}<Pager meta={withdrawalMeta} onPage={setWithdrawalPage} /></>}
+        {activeTab === 'ledger' && <><div className="flex flex-wrap items-center justify-between gap-3 border-b border-stone-100 px-5 py-4"><div><h2 className="font-serif text-lg font-bold text-stone-950">Immutable ledger</h2><p className="text-xs text-stone-500">Every balance movement recorded by the marketplace.</p></div><select value={bucket} onChange={(event) => { setBucket(event.target.value as BalanceBucket | ''); setTransactionPage(1); }} className="rounded-lg border border-stone-200 px-3 py-2 text-xs"><option value="">All balance buckets</option>{['pending', 'available', 'reserved', 'paid'].map((value) => <option key={value} value={value}>{words(value)}</option>)}</select></div>{loadingTransactions ? <LoadingRows /> : transactions.length === 0 ? <div className="p-12 text-center text-sm text-stone-500">No ledger entries found.</div> : <div className="divide-y divide-stone-100">{transactions.map((entry) => <article key={entry.id} className="flex items-center gap-4 px-5 py-4 text-xs"><span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${entry.amountPaise >= 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>{entry.amountPaise >= 0 ? <ArrowDownLeft className="h-4 w-4" /> : <ArrowUpRight className="h-4 w-4" />}</span><div className="min-w-0 flex-1"><p className="truncate font-semibold text-stone-900">{words(entry.type)}</p><p className="mt-1 text-stone-400">{words(entry.balanceBucket)} · {dateTime(entry.createdAt)}</p></div><p className={`font-bold ${entry.amountPaise >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>{entry.amountPaise >= 0 ? '+' : '−'}{money(Math.abs(entry.amountPaise), entry.currency)}</p></article>)}</div>}<Pager meta={transactionMeta} onPage={setTransactionPage} /></>}
+      </section>
+      <p className="text-center text-xs text-stone-400">Need settlement mode or payout account changes? Contact your administrator. <Link to="/settings" className="font-semibold text-amber-800 hover:underline">View account settings</Link></p>
+    </main>
+  </div>;
 };

@@ -1,6 +1,6 @@
 # DesignHub Frontend UI Audit and Integration Roadmap
 
-Status: Phases 1 through 5 are implemented and build-verified as of 21 November 2026. Phase 6 wallet integration is next.
+Status: Phases 1 through 6 are implemented and build-verified as of 21 November 2026. Phase 7 production hardening is next.
 
 Reviewed sources:
 
@@ -438,6 +438,16 @@ Implementation status (21 November 2026): implemented and build-verified; live d
 - Remove all local wallet simulations.
 
 Exit condition: UI values reconcile with backend records and retries cannot duplicate actions.
+
+Implementation status (21 November 2026): implemented and build-verified; live deployment acceptance remains.
+
+- Connected server wallet balances, earnings, settlement snapshots, withdrawal history and immutable ledger records.
+- Added server-side status/bucket filters and independent pagination for each financial record type.
+- Withdrawal creation uses a stable idempotency key, server minimum/balance validation and confirmation before reserving funds.
+- Connected cancellation for eligible seller-requested withdrawals and refetches every affected balance/record after mutations.
+- Manual versus automatic settlement is read-only in the seller UI and remains administrator-managed.
+- Test mode is persistent and explicit; simulated payouts are never presented as real bank transfers.
+- Removed active mock wallet balances, earnings, settlement cycles, ledger entries and withdrawal mutations from application context.
 
 ### Phase 7 — production hardening
 

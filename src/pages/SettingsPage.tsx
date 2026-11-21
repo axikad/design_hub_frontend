@@ -1,27 +1,19 @@
 import React, { useState } from 'react';
 import {
   User,
-  Shield,
   Bell,
   CreditCard,
-  Sliders,
   Trash2,
-  CheckCircle2,
-  Sparkles,
-  Building2
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { ConfirmationDialog } from '../components/common/ConfirmationDialog';
-import { MACHINE_OPTIONS } from '../data/mockData';
 
 export const SettingsPage: React.FC = () => {
-  const { user, updateUserProfile, setSettlementMode, logout, showToast } = useApp();
+  const { user, updateUserProfile, logout } = useApp();
 
   const [name, setName] = useState(user.name);
   const [email, setEmail] = useState(user.email);
   const [phone, setPhone] = useState(user.phone);
-  const [bankAccount, setBankAccount] = useState(user.bankAccount);
-  const [settlementMode, setLocalSettlementMode] = useState(user.settlementMode);
   const [notifyOnSale, setNotifyOnSale] = useState(true);
   const [notifyOnSettlement, setNotifyOnSettlement] = useState(true);
   const [notifyWeeklyDrop, setNotifyWeeklyDrop] = useState(false);
@@ -33,10 +25,7 @@ export const SettingsPage: React.FC = () => {
       name,
       email,
       phone,
-      bankAccount,
-      settlementMode,
     });
-    setSettlementMode(settlementMode);
   };
 
   return (
@@ -112,55 +101,20 @@ export const SettingsPage: React.FC = () => {
           <div className="bg-white p-6 rounded-2xl border border-stone-200/90 shadow-xs space-y-4">
             <h3 className="font-serif text-base font-bold text-stone-900 border-b border-stone-100 pb-3 flex items-center gap-2">
               <CreditCard className="w-4 h-4 text-stone-600" />
-              Settlement Mode & Bank Payout Information
+              Settlement mode
             </h3>
 
             <div className="space-y-3 text-xs">
-              <label className="font-semibold text-stone-700 block">
-                Payout Disbursement Mode
-              </label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <button
-                  type="button"
-                  onClick={() => setLocalSettlementMode('manual')}
-                  className={`p-3.5 rounded-xl border text-left transition-all ${
-                    settlementMode === 'manual'
-                      ? 'bg-amber-50 border-amber-300 text-amber-950 font-semibold'
-                      : 'bg-stone-50 border-stone-200 text-stone-600'
-                  }`}
-                >
-                  <span className="font-bold block">Manual Withdrawal Request</span>
-                  <p className="text-[11px] text-stone-500 mt-1">
-                    Funds sit in your Available balance until you submit a manual withdrawal.
-                  </p>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setLocalSettlementMode('automatic')}
-                  className={`p-3.5 rounded-xl border text-left transition-all ${
-                    settlementMode === 'automatic'
-                      ? 'bg-amber-50 border-amber-300 text-amber-950 font-semibold'
-                      : 'bg-stone-50 border-stone-200 text-stone-600'
-                  }`}
-                >
-                  <span className="font-bold block">Automatic Bank Transfer</span>
-                  <p className="text-[11px] text-stone-500 mt-1">
-                    Eligible test earnings follow the settlement schedule returned by the server. Live bank transfer is not enabled yet.
-                  </p>
-                </button>
-              </div>
-
-              <div className="space-y-1 pt-2">
-                <label className="font-semibold text-stone-700 block">
-                  Payout account reference (UI preview)
-                </label>
-                <input
-                  type="text"
-                  value={bankAccount}
-                  onChange={(e) => setBankAccount(e.target.value)}
-                  className="w-full p-2.5 bg-stone-50 border border-stone-300 rounded-lg text-stone-900 font-mono text-xs"
-                />
+              <div className="rounded-xl border border-stone-200 bg-stone-50 p-4">
+                <div className="flex items-center justify-between gap-4">
+                  <span className="font-semibold text-stone-900">Payout disbursement mode</span>
+                  <span className="rounded-full bg-white px-3 py-1 font-semibold capitalize text-stone-700 shadow-xs">
+                    {user.settlementMode}
+                  </span>
+                </div>
+                <p className="mt-2 text-[11px] leading-5 text-stone-500">
+                  This value is managed by the marketplace administrator. Open Wallet & settlements to view the live schedule and withdrawal availability.
+                </p>
               </div>
             </div>
           </div>
