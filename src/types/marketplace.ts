@@ -60,6 +60,8 @@ export interface ApiDesign {
   fileUri: string | null;
   hasFile: boolean;
   createdAt: string | null;
+  sellerName: string | null;
+  sellerAvatarUri: string | null;
   ownerKey: string | null;
 }
 
@@ -73,7 +75,9 @@ export interface ApiHomeSection {
 export interface ApiHomeData {
   latest: ApiHomeSection;
   today: ApiHomeSection;
-  tomorrow: ApiHomeSection;
+  yesterday?: ApiHomeSection;
+  /** Retained by the API for older app builds. New marketplace surfaces do not show future designs. */
+  tomorrow?: ApiHomeSection;
   categories: Array<{
     id: string;
     name: string;
@@ -191,6 +195,10 @@ export interface DesignCardData {
   price: number;
   images: string[];
   createdAt: string;
+  description: string;
+  sellerName: string;
+  sellerAvatar: string | null;
+  formats: string[];
   isNew?: boolean;
 }
 

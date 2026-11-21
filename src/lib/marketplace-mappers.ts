@@ -26,6 +26,16 @@ export const toDesignCard = (design: ApiDesign, filters?: BrowseFilters | null):
     .filter((uri): uri is string => Boolean(uri));
   const fallbackImage = normalizeAssetUrl(design.imageUri);
   if (images.length === 0 && fallbackImage) images.push(fallbackImage);
+  const formats = [...new Set([
+    ...design.files.map((file) => file.name.split('.').pop()?.toUpperCase()).filter((value): value is string => Boolean(value)),
+    design.designFileExtension?.replace(/^\./, '').toUpperCase(),
+  ].filter((value): value is string => Boolean(value)))];
+  const typeNames = [...new Set(variants.map((variant) => variant.typeName || variant.customTypeName).filter((value): value is string => Boolean(value)))];
+  const descriptionParts = [
+    typeNames.length ? `${typeNames.join(', ')} specification${typeNames.length === 1 ? '' : 's'}` : null,
+    design.sequenceType ? `${design.sequenceType} sequence` : null,
+    formats.length ? `${formats.join(', ')} file${formats.length === 1 ? '' : 's'}` : null,
+  ].filter((value): value is string => Boolean(value));
 
   return {
     id: design.id,
@@ -38,6 +48,10 @@ export const toDesignCard = (design: ApiDesign, filters?: BrowseFilters | null):
     price: design.pricePaise / 100,
     images,
     createdAt: design.createdAt || design.publishDate || '',
+    description: descriptionParts.join(' · ') || 'Production-ready textile design with detailed specifications.',
+    sellerName: design.sellerName || 'Textile Design Hub creator',
+    sellerAvatar: normalizeAssetUrl(design.sellerAvatarUri),
+    formats,
     isNew: Boolean(design.publishDate && Date.now() - new Date(design.publishDate).getTime() < 14 * 86400000),
   };
 };

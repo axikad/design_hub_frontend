@@ -68,8 +68,15 @@ export const HomePage: React.FC = () => {
     () => (home?.today.items ?? []).map((design) => toDesignCard(design, filters)),
     [home, filters],
   );
-  const tomorrowDesigns = useMemo(
-    () => (home?.tomorrow.items ?? []).map((design) => toDesignCard(design, filters)),
+  const yesterdayDesigns = useMemo(
+    () => (home?.yesterday?.items ?? []).map((design) => toDesignCard(design, filters)),
+    [home, filters],
+  );
+  const categoryDesignSections = useMemo(
+    () => (home?.categories ?? []).map((category) => ({
+      ...category,
+      designs: category.items.map((design) => toDesignCard(design, filters)),
+    })),
     [home, filters],
   );
   const folderCards = useMemo(() => folders.map(toFolderCard), [folders]);
@@ -231,20 +238,36 @@ export const HomePage: React.FC = () => {
         </div>
       </section>
 
+      {!loading && (todayDesigns.length > 0 || yesterdayDesigns.length > 0) && (
+        <section className="border-b border-stone-200 bg-[#FAF8F5] py-16">
+          <div className="mx-auto grid max-w-7xl gap-12 px-4 sm:px-6 lg:grid-cols-2 lg:px-8">
+            <FeedColumn eyebrow="Published today" title="Today's designs" designs={todayDesigns} viewAll="/explore?section=today" />
+            <FeedColumn eyebrow="Recently published" title="Yesterday's designs" designs={yesterdayDesigns} viewAll="/explore?section=yesterday" />
+          </div>
+        </section>
+      )}
+
+      {!loading && categoryDesignSections.map((category, index) => category.designs.length > 0 && (
+        <section key={category.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-[#FAF8F5]'} border-b border-stone-200 py-14`}>
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <SectionHeading
+              eyebrow="Browse by category"
+              title={`${category.name} designs`}
+              link={`/explore?category=${encodeURIComponent(category.id)}`}
+              linkLabel={category.hasMore ? `View all ${category.total}` : 'Explore category'}
+            />
+            <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+              {category.designs.slice(0, 4).map((design) => <DesignCard key={design.id} design={design} />)}
+            </div>
+          </div>
+        </section>
+      ))}
+
       {(loading || folderCards.length > 0) && (
         <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
           <SectionHeading eyebrow="Design folders" title="Browse grouped design files" link="/collections" linkLabel="View all folders" />
           <p className="mt-2 max-w-2xl text-sm text-stone-500">Explore purchasable design archives with file previews and server-provided pricing.</p>
           {loading ? <div className="mt-8"><LoadingSkeleton count={3} /></div> : <div className="mt-8 grid gap-6 md:grid-cols-3">{folderCards.map((folder) => <CollectionCard key={folder.id} collection={folder} />)}</div>}
-        </section>
-      )}
-
-      {!loading && (todayDesigns.length > 0 || tomorrowDesigns.length > 0) && (
-        <section className="border-y border-stone-200 bg-white py-16">
-          <div className="mx-auto grid max-w-7xl gap-12 px-4 sm:px-6 lg:grid-cols-2 lg:px-8">
-            <FeedColumn eyebrow="Available today" title="Today's designs" designs={todayDesigns} viewAll="/explore?section=today" />
-            <FeedColumn eyebrow="Coming next" title="Tomorrow's designs" designs={tomorrowDesigns} viewAll="/explore?section=tomorrow" />
-          </div>
         </section>
       )}
 
