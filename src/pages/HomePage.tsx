@@ -225,43 +225,47 @@ export const HomePage: React.FC = () => {
         )}
       </section>
 
-      <section className="border-y border-stone-200 bg-white py-14">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <SectionHeading eyebrow="Recently published" title="Latest production designs" link="/explore" linkLabel="View all designs" />
-          {loading ? (
-            <div className="mt-8"><LoadingSkeleton count={8} /></div>
-          ) : latestDesigns.length > 0 ? (
-            <DesignCardRow designs={latestDesigns} />
-          ) : (
-            <EmptySection copy="No published designs are available yet." />
-          )}
-        </div>
-      </section>
-
-      {!loading && todayDesigns.length > 0 && <DesignSection eyebrow="Published today" title="Today's designs" designs={todayDesigns} viewAll="/explore?section=today" className="bg-[#FAF8F5]" />}
-      {!loading && yesterdayDesigns.length > 0 && <DesignSection eyebrow="Recently published" title="Yesterday's designs" designs={yesterdayDesigns} viewAll="/explore?section=yesterday" className="bg-white" />}
-
-      {!loading && categoryDesignSections.map((category, index) => category.designs.length > 0 && (
-        <section key={category.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-[#FAF8F5]'} border-b border-stone-200 py-14`}>
+      <div className="[&>section:nth-child(even)]:bg-[#FAF8F5] [&>section:nth-child(odd)]:bg-white">
+        <section className="border-y border-stone-200 py-14">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            <SectionHeading
-              eyebrow="Browse by category"
-              title={`${category.name} designs`}
-              link={`/explore?category=${encodeURIComponent(category.id)}`}
-              linkLabel={category.hasMore ? `View all ${category.total}` : 'Explore category'}
-            />
-            <DesignCardRow designs={category.designs} />
+            <SectionHeading eyebrow="Recently published" title="Latest production designs" link="/explore" linkLabel="View all designs" />
+            {loading ? (
+              <div className="mt-8"><LoadingSkeleton count={8} /></div>
+            ) : latestDesigns.length > 0 ? (
+              <DesignCardRow designs={latestDesigns} />
+            ) : (
+              <EmptySection copy="No published designs are available yet." />
+            )}
           </div>
         </section>
-      ))}
 
-      {(loading || folderCards.length > 0) && (
-        <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
-          <SectionHeading eyebrow="Design folders" title="Browse grouped design files" link="/collections" linkLabel="View all folders" />
-          <p className="mt-2 max-w-2xl text-sm text-stone-500">Explore purchasable design archives with file previews and server-provided pricing.</p>
-          {loading ? <div className="mt-8"><LoadingSkeleton count={3} /></div> : <div className="mt-8 grid gap-6 md:grid-cols-3">{folderCards.map((folder) => <CollectionCard key={folder.id} collection={folder} />)}</div>}
-        </section>
-      )}
+        {!loading && todayDesigns.length > 0 && <DesignSection eyebrow="Published today" title="Today's designs" designs={todayDesigns} viewAll="/explore?section=today" />}
+        {!loading && yesterdayDesigns.length > 0 && <DesignSection eyebrow="Recently published" title="Yesterday's designs" designs={yesterdayDesigns} viewAll="/explore?section=yesterday" />}
+
+        {!loading && categoryDesignSections.map((category) => category.designs.length > 0 && (
+          <section key={category.id} className="border-b border-stone-200 py-14">
+            <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+              <SectionHeading
+                eyebrow="Browse by category"
+                title={`${category.name} designs`}
+                link={`/explore?category=${encodeURIComponent(category.id)}`}
+                linkLabel={category.hasMore ? `View all ${category.total}` : 'Explore category'}
+              />
+              <DesignCardRow designs={category.designs} />
+            </div>
+          </section>
+        ))}
+
+        {(loading || folderCards.length > 0) && (
+          <section className="border-b border-stone-200 py-16">
+            <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+              <SectionHeading eyebrow="Design folders" title="Browse grouped design files" link="/collections" linkLabel="View all folders" />
+              <p className="mt-2 max-w-2xl text-sm text-stone-500">Explore purchasable design archives with file previews and server-provided pricing.</p>
+              {loading ? <div className="mt-8"><LoadingSkeleton count={3} /></div> : <div className="mt-8 grid gap-6 md:grid-cols-3">{folderCards.map((folder) => <CollectionCard key={folder.id} collection={folder} />)}</div>}
+            </div>
+          </section>
+        )}
+      </div>
 
       <section className="bg-stone-950 py-16 text-stone-200">
         <div className="mx-auto grid max-w-7xl gap-12 px-4 sm:px-6 lg:grid-cols-2 lg:items-center lg:px-8">
@@ -337,9 +341,8 @@ const DesignSection: React.FC<{
   title: string;
   designs: DesignCardData[];
   viewAll: string;
-  className: string;
-}> = ({ eyebrow, title, designs, viewAll, className }) => (
-  <section className={`${className} border-b border-stone-200 py-14`}>
+}> = ({ eyebrow, title, designs, viewAll }) => (
+  <section className="border-b border-stone-200 py-14">
     <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
       <SectionHeading eyebrow={eyebrow} title={title} link={viewAll} linkLabel="View all designs" />
       <DesignCardRow designs={designs} />
