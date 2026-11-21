@@ -73,10 +73,14 @@ export const HomePage: React.FC = () => {
     [home, filters],
   );
   const categoryDesignSections = useMemo(
-    () => (home?.categories ?? []).map((category) => ({
-      ...category,
-      designs: category.items.map((design) => toDesignCard(design, filters)),
-    })),
+    () => [...(home?.categories ?? [])]
+      .filter((category) => category.total > 0 && category.items.length > 0)
+      .sort((first, second) => second.total - first.total || first.name.localeCompare(second.name))
+      .slice(0, 3)
+      .map((category) => ({
+        ...category,
+        designs: category.items.map((design) => toDesignCard(design, filters)),
+      })),
     [home, filters],
   );
   const folderCards = useMemo(() => folders.map(toFolderCard), [folders]);
