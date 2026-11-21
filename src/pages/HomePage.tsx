@@ -231,21 +231,15 @@ export const HomePage: React.FC = () => {
           {loading ? (
             <div className="mt-8"><LoadingSkeleton count={8} /></div>
           ) : latestDesigns.length > 0 ? (
-            <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">{latestDesigns.slice(0, 8).map((design) => <DesignCard key={design.id} design={design} />)}</div>
+            <DesignCardRow designs={latestDesigns} />
           ) : (
             <EmptySection copy="No published designs are available yet." />
           )}
         </div>
       </section>
 
-      {!loading && (todayDesigns.length > 0 || yesterdayDesigns.length > 0) && (
-        <section className="border-b border-stone-200 bg-[#FAF8F5] py-16">
-          <div className="mx-auto grid max-w-7xl gap-12 px-4 sm:px-6 lg:grid-cols-2 lg:px-8">
-            <FeedColumn eyebrow="Published today" title="Today's designs" designs={todayDesigns} viewAll="/explore?section=today" />
-            <FeedColumn eyebrow="Recently published" title="Yesterday's designs" designs={yesterdayDesigns} viewAll="/explore?section=yesterday" />
-          </div>
-        </section>
-      )}
+      {!loading && todayDesigns.length > 0 && <DesignSection eyebrow="Published today" title="Today's designs" designs={todayDesigns} viewAll="/explore?section=today" className="bg-[#FAF8F5]" />}
+      {!loading && yesterdayDesigns.length > 0 && <DesignSection eyebrow="Recently published" title="Yesterday's designs" designs={yesterdayDesigns} viewAll="/explore?section=yesterday" className="bg-white" />}
 
       {!loading && categoryDesignSections.map((category, index) => category.designs.length > 0 && (
         <section key={category.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-[#FAF8F5]'} border-b border-stone-200 py-14`}>
@@ -256,9 +250,7 @@ export const HomePage: React.FC = () => {
               link={`/explore?category=${encodeURIComponent(category.id)}`}
               linkLabel={category.hasMore ? `View all ${category.total}` : 'Explore category'}
             />
-            <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-              {category.designs.slice(0, 4).map((design) => <DesignCard key={design.id} design={design} />)}
-            </div>
+            <DesignCardRow designs={category.designs} />
           </div>
         </section>
       ))}
@@ -330,17 +322,27 @@ const EmptySection: React.FC<{ copy: string }> = ({ copy }) => (
   <div className="mt-8 rounded-2xl border border-dashed border-stone-300 bg-white p-10 text-center text-sm text-stone-500">{copy}</div>
 );
 
-const FeedColumn: React.FC<{
+const DesignCardRow: React.FC<{ designs: DesignCardData[] }> = ({ designs }) => (
+  <div className="mt-8 flex snap-x snap-mandatory gap-5 overflow-x-auto pb-3 lg:gap-6">
+    {designs.slice(0, 4).map((design) => (
+      <div key={design.id} className="w-[82vw] max-w-[20rem] shrink-0 snap-start sm:w-[calc(50%-0.625rem)] sm:max-w-none lg:w-[calc(25%-1.125rem)]">
+        <DesignCard design={design} />
+      </div>
+    ))}
+  </div>
+);
+
+const DesignSection: React.FC<{
   eyebrow: string;
   title: string;
   designs: DesignCardData[];
   viewAll: string;
-}> = ({ eyebrow, title, designs, viewAll }) => (
-  <div>
-    <div className="mb-6 flex items-end justify-between gap-4 border-b border-stone-200 pb-4">
-      <div><p className="text-xs font-bold uppercase tracking-[0.16em] text-amber-800">{eyebrow}</p><h2 className="mt-1 font-serif text-2xl font-semibold text-stone-950">{title}</h2></div>
-      {designs.length > 0 && <Link to={viewAll} className="text-xs font-semibold text-stone-600 hover:text-amber-900">View all</Link>}
+  className: string;
+}> = ({ eyebrow, title, designs, viewAll, className }) => (
+  <section className={`${className} border-b border-stone-200 py-14`}>
+    <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+      <SectionHeading eyebrow={eyebrow} title={title} link={viewAll} linkLabel="View all designs" />
+      <DesignCardRow designs={designs} />
     </div>
-    {designs.length > 0 ? <div className="space-y-4">{designs.slice(0, 3).map((design) => <DesignCard key={design.id} design={design} viewMode="list" />)}</div> : <div className="rounded-xl border border-dashed border-stone-300 p-8 text-center text-sm text-stone-500">No designs in this section yet.</div>}
-  </div>
+  </section>
 );

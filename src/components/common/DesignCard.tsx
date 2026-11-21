@@ -83,8 +83,8 @@ export const DesignCard: React.FC<DesignCardProps> = ({ design, viewMode = 'grid
       </div>
       <div className="flex flex-1 flex-col p-4">
         <div className="flex items-center gap-2 text-[10px] uppercase tracking-wider text-stone-500"><span className="truncate font-semibold text-amber-800">{design.category}</span><span>·</span><span className="truncate">{design.machine}</span></div>
-        <Link to={`/design/${design.id}`} title={design.title} className="mt-2 block line-clamp-2 min-h-12 font-serif text-lg font-semibold leading-6 text-stone-950 transition group-hover:text-amber-900">{design.title}</Link>
-        <p className="mt-2 line-clamp-2 min-h-10 text-xs leading-5 text-stone-500">{design.description}</p>
+        <Link to={`/design/${design.id}`} title={design.title} className="mt-2 block line-clamp-2 font-serif text-lg font-semibold leading-6 text-stone-950 transition group-hover:text-amber-900">{design.title}</Link>
+        <p className="mt-2 line-clamp-2 text-xs leading-5 text-stone-500">{design.description}</p>
         <div className="mt-4 flex items-center justify-between gap-2 border-t border-stone-100 pt-3 text-[11px] text-stone-500">
           <span className="inline-flex min-w-0 items-center gap-1.5"><SellerAvatar design={design} /><span className="truncate">{design.sellerName}</span></span>
           <span className="shrink-0 font-mono text-[10px] text-stone-400">{design.formats.slice(0, 3).join(' · ') || 'FILE'}</span>
