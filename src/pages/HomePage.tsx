@@ -1,5 +1,15 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { AlertCircle, ArrowRight, Compass, Cpu, Search, Store, UploadCloud } from 'lucide-react';
+import {
+  AlertCircle,
+  ArrowRight,
+  CheckCircle2,
+  ChevronRight,
+  Cpu,
+  Search,
+  Sparkles,
+  Store,
+  UploadCloud,
+} from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { CollectionCard } from '../components/common/CollectionCard';
 import { DesignCard } from '../components/common/DesignCard';
@@ -8,7 +18,7 @@ import { useApp } from '../context/AppContext';
 import heroImage from '../assets/images/hero_textile_embroidery_1793879816875.jpg';
 import { getErrorMessage, marketplaceApi } from '../lib/api-client';
 import { toDesignCard, toFolderCard } from '../lib/marketplace-mappers';
-import type { ApiFolder, ApiHomeData, BrowseFilters } from '../types/marketplace';
+import type { ApiFolder, ApiHomeData, BrowseFilters, DesignCardData } from '../types/marketplace';
 
 export const HomePage: React.FC = () => {
   const { user, setSearchQuery } = useApp();
@@ -25,6 +35,7 @@ export const HomePage: React.FC = () => {
     const controller = new AbortController();
     setLoading(true);
     setError('');
+
     Promise.all([
       marketplaceApi.home(controller.signal),
       marketplaceApi.browseFilters(controller.signal),
@@ -42,6 +53,7 @@ export const HomePage: React.FC = () => {
       .finally(() => {
         if (!controller.signal.aborted) setLoading(false);
       });
+
     return () => controller.abort();
   }, [reloadKey]);
 
@@ -49,7 +61,16 @@ export const HomePage: React.FC = () => {
     () => (home?.latest.items ?? []).map((design) => toDesignCard(design, filters)),
     [home, filters],
   );
+  const todayDesigns = useMemo(
+    () => (home?.today.items ?? []).map((design) => toDesignCard(design, filters)),
+    [home, filters],
+  );
+  const tomorrowDesigns = useMemo(
+    () => (home?.tomorrow.items ?? []).map((design) => toDesignCard(design, filters)),
+    [home, filters],
+  );
   const folderCards = useMemo(() => folders.map(toFolderCard), [folders]);
+  const heroDesign = latestDesigns[0] ?? null;
 
   const submitSearch = (event: React.FormEvent) => {
     event.preventDefault();
@@ -59,71 +80,235 @@ export const HomePage: React.FC = () => {
   };
 
   return (
-    <main>
-      <section className="border-b border-stone-200 bg-[radial-gradient(circle_at_top_right,_rgba(217,119,6,0.08),_transparent_34%)]">
-        <div className="mx-auto grid max-w-7xl gap-12 px-4 py-14 sm:px-6 sm:py-20 lg:grid-cols-[1.05fr_0.95fr] lg:items-center lg:px-8 lg:py-24">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-amber-800">Digital textile design marketplace</p>
-            <h1 className="mt-4 max-w-3xl font-serif text-4xl font-bold leading-[1.08] text-stone-950 sm:text-5xl lg:text-6xl">Find textile designs for your machine and production needs.</h1>
-            <p className="mt-6 max-w-2xl text-base leading-7 text-stone-600 sm:text-lg">Browse the live catalog by machine type, category, design type and production specifications.</p>
-            <form onSubmit={submitSearch} className="mt-8 flex max-w-2xl flex-col gap-2 rounded-2xl border border-stone-200 bg-white p-2 shadow-lg shadow-stone-900/5 sm:flex-row">
-              <label htmlFor="home-search" className="sr-only">Search designs</label>
-              <div className="relative min-w-0 flex-1"><Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-stone-400" /><input id="home-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search designs by title" className="h-12 w-full rounded-xl border-0 bg-transparent pl-12 pr-4 text-sm text-stone-950 outline-none placeholder:text-stone-400 focus:ring-2 focus:ring-amber-700/25" /></div>
-              <button type="submit" className="h-12 rounded-xl bg-stone-950 px-6 text-sm font-semibold text-white transition hover:bg-amber-900 focus-visible:ring-2 focus-visible:ring-amber-700 focus-visible:ring-offset-2">Browse designs</button>
+    <main className="min-h-screen bg-[#FAF8F5]">
+      <section className="relative overflow-hidden border-b border-stone-200/80 bg-gradient-to-b from-[#F5F2EB] to-[#FAF8F5] py-12 lg:py-20">
+        <div className="mx-auto grid max-w-7xl grid-cols-1 items-center gap-12 px-4 sm:px-6 lg:grid-cols-12 lg:px-8">
+          <div className="space-y-6 lg:col-span-7">
+            <div className="flex flex-wrap items-center gap-2 text-xs font-medium tracking-wide text-amber-900/90">
+              <span>Digital textile design marketplace</span>
+              <span aria-hidden="true">·</span>
+              <span>Browse by machine and production needs</span>
+            </div>
+
+            <h1 className="max-w-3xl text-balance font-serif text-4xl font-bold leading-[1.08] tracking-tight text-stone-950 sm:text-5xl lg:text-6xl">
+              Production-ready textile designs and stitch files.
+            </h1>
+            <p className="max-w-2xl text-base leading-7 text-stone-600 sm:text-lg">
+              Find designs by machine, machine type, category and exact production specifications. Review every available detail before you purchase.
+            </p>
+
+            <form onSubmit={submitSearch} className="max-w-2xl">
+              <div className="flex flex-col gap-2 rounded-xl border border-stone-200 bg-white p-1.5 shadow-lg shadow-stone-900/5 sm:flex-row">
+                <label htmlFor="home-search" className="sr-only">Search designs</label>
+                <div className="relative flex min-w-0 flex-1 items-center">
+                  <Search className="ml-3.5 h-5 w-5 shrink-0 text-stone-400" aria-hidden="true" />
+                  <input
+                    id="home-search"
+                    value={query}
+                    onChange={(event) => setQuery(event.target.value)}
+                    placeholder="Search design title"
+                    className="w-full bg-transparent px-3 py-3 text-sm text-stone-950 outline-none placeholder:text-stone-400"
+                  />
+                </div>
+                <button type="submit" className="rounded-lg bg-stone-950 px-6 py-3 text-sm font-semibold text-white transition hover:bg-amber-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-700 focus-visible:ring-offset-2">
+                  Explore designs
+                </button>
+              </div>
             </form>
-            <p className="mt-6 inline-flex items-center gap-2 text-xs text-stone-500"><Compass className="h-4 w-4 text-amber-700" />Catalog data is loaded from the live marketplace service.</p>
+
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-3 pt-1 text-xs text-stone-500">
+              {['Live machine catalog', 'Server-priced checkout', 'Protected downloads after payment'].map((item) => (
+                <span key={item} className="inline-flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-700" aria-hidden="true" />{item}
+                </span>
+              ))}
+            </div>
           </div>
-          <div className="relative mx-auto w-full max-w-xl"><div className="overflow-hidden rounded-[2rem] border border-stone-200 bg-stone-100 shadow-2xl shadow-stone-900/10"><img src={heroImage} width="1376" height="768" fetchPriority="high" alt="Detailed textile embroidery design" className="aspect-[4/3] w-full object-cover" /></div><div className="absolute -bottom-5 left-5 right-5 rounded-2xl border border-stone-700 bg-stone-950 p-4 text-white shadow-xl sm:left-8 sm:right-8"><p className="text-[10px] font-bold uppercase tracking-[0.18em] text-amber-300">Review before purchase</p><p className="mt-1 text-sm text-stone-200">Compare machine, dimensions and design-type specifications.</p></div></div>
+
+          <div className="lg:col-span-5">
+            <div className="group relative overflow-hidden rounded-2xl border border-stone-300/80 bg-stone-100 shadow-2xl shadow-stone-900/15">
+              <img src={heroImage} width="1376" height="768" fetchPriority="high" alt="Detailed textile embroidery design" className="aspect-[4/3] w-full object-cover transition duration-700 group-hover:scale-[1.03]" />
+              <div className="absolute bottom-4 left-4 right-4 rounded-xl border border-stone-700/80 bg-stone-950/90 p-4 text-white shadow-xl backdrop-blur-md">
+                {heroDesign ? (
+                  <>
+                    <div className="flex items-center justify-between gap-3 text-[10px] font-bold uppercase tracking-[0.16em] text-amber-300">
+                      <span>Latest design</span>
+                      <span className="font-mono font-medium tracking-normal text-stone-300">{heroDesign.stitches.toLocaleString('en-IN')} stitches</span>
+                    </div>
+                    <h2 className="mt-2 line-clamp-1 font-serif text-lg font-semibold">{heroDesign.title}</h2>
+                    <div className="mt-3 flex items-center justify-between gap-3 border-t border-stone-700 pt-3 text-xs">
+                      <span className="truncate text-stone-300">{heroDesign.machine}</span>
+                      <Link to={`/design/${heroDesign.id}`} className="inline-flex shrink-0 items-center gap-1 font-semibold text-amber-300 hover:text-amber-200">View details <ArrowRight className="h-3.5 w-3.5" /></Link>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-amber-300">Review before purchase</p>
+                    <p className="mt-2 text-sm text-stone-200">Compare machine, dimensions and design-type specifications.</p>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
-      {error && <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8"><div className="flex flex-col items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-5 text-sm text-red-900 sm:flex-row sm:items-center sm:justify-between"><span className="inline-flex items-center gap-2"><AlertCircle className="h-5 w-5" />{error}</span><button type="button" onClick={() => setReloadKey((value) => value + 1)} className="rounded-lg bg-red-900 px-4 py-2 text-xs font-semibold text-white">Try again</button></div></section>}
-
-      <section className="border-b border-stone-200 bg-white py-14">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex items-end justify-between gap-4">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-[0.18em] text-amber-800">Machine catalog</p>
-              <h2 className="mt-2 font-serif text-3xl font-semibold text-stone-950">Browse by machine</h2>
-              <p className="mt-2 text-sm text-stone-500">Start with your machine, then narrow designs by machine type and production details.</p>
-            </div>
-            <Link to="/explore" className="hidden items-center gap-1 text-sm font-semibold text-stone-700 hover:text-amber-900 sm:flex">All machines <ArrowRight className="h-4 w-4" /></Link>
+      {error && (
+        <section className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+          <div className="flex flex-col items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-900 sm:flex-row sm:items-center sm:justify-between">
+            <span className="inline-flex items-center gap-2"><AlertCircle className="h-5 w-5" />{error}</span>
+            <button type="button" onClick={() => setReloadKey((value) => value + 1)} className="rounded-lg bg-red-900 px-4 py-2 text-xs font-semibold text-white">Try again</button>
           </div>
+        </section>
+      )}
+
+      <section className="border-b border-stone-200 bg-white py-9">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <SectionHeading eyebrow="Machine catalog" title="Browse by machine" link="/explore" linkLabel="All machines" compact />
           {loading ? (
-            <div className="mt-7 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-              {Array.from({ length: 6 }).map((_, index) => <div key={index} className="h-32 animate-pulse rounded-xl bg-stone-100" />)}
-            </div>
+            <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">{Array.from({ length: 6 }).map((_, index) => <div key={index} className="h-28 animate-pulse rounded-xl bg-stone-100" />)}</div>
           ) : (filters?.machines ?? []).length > 0 ? (
-            <div className="mt-7 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-              {(filters?.machines ?? []).map((machine) => (
-                <Link
-                  key={machine.id}
-                  to={`/explore?machine=${encodeURIComponent(machine.id)}`}
-                  className="group overflow-hidden rounded-xl border border-stone-200 bg-[#FAF8F5] transition hover:-translate-y-0.5 hover:border-amber-400 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-700 focus-visible:ring-offset-2"
-                >
-                  <div className="flex aspect-[16/9] items-center justify-center overflow-hidden bg-stone-100">
-                    {machine.imageUri ? <img src={machine.imageUri} alt="" loading="lazy" className="h-full w-full object-cover transition duration-300 group-hover:scale-105" /> : <Cpu className="h-7 w-7 text-stone-400" aria-hidden="true" />}
+            <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+              {(filters?.machines ?? []).slice(0, 6).map((machine) => (
+                <Link key={machine.id} to={`/explore?machine=${encodeURIComponent(machine.id)}`} className="group overflow-hidden rounded-xl border border-stone-200/80 bg-stone-50/60 transition hover:-translate-y-0.5 hover:border-amber-600/60 hover:bg-amber-50/30 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-700 focus-visible:ring-offset-2">
+                  <div className="flex aspect-[16/8] items-center justify-center overflow-hidden bg-stone-100">
+                    {machine.imageUri ? <img src={machine.imageUri} alt="" loading="lazy" className="h-full w-full object-cover transition duration-300 group-hover:scale-105" /> : <Cpu className="h-6 w-6 text-stone-500" aria-hidden="true" />}
                   </div>
-                  <div className="flex items-center justify-between gap-2 p-3">
-                    <span className="text-sm font-semibold leading-snug text-stone-800 group-hover:text-amber-950">{machine.name}</span>
-                    <ArrowRight className="h-4 w-4 shrink-0 text-stone-400 group-hover:text-amber-800" aria-hidden="true" />
+                  <div className="p-3">
+                    <h3 className="text-sm font-semibold leading-snug text-stone-900 group-hover:text-amber-950">{machine.name}</h3>
+                    <p className="mt-1 text-[10px] text-stone-500">{machine.machineTypeIds.length} machine {machine.machineTypeIds.length === 1 ? 'type' : 'types'}</p>
                   </div>
                 </Link>
               ))}
             </div>
           ) : (
-            <div className="mt-7 rounded-2xl border border-dashed border-stone-300 bg-[#FAF8F5] p-8 text-center text-sm text-stone-500">No active machines are available yet.</div>
+            <EmptySection copy="No active machines are available yet." />
           )}
         </div>
       </section>
 
-      <section className="py-14 sm:py-18"><div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8"><div className="flex items-end justify-between gap-4"><div><p className="text-xs font-bold uppercase tracking-[0.18em] text-amber-800">Marketplace</p><h2 className="mt-2 font-serif text-3xl font-semibold text-stone-950">Latest designs</h2><p className="mt-2 text-sm text-stone-500">Recently published designs from the live catalog.</p></div><Link to="/explore" className="hidden items-center gap-1 text-sm font-semibold text-stone-700 hover:text-amber-900 sm:flex">Explore all <ArrowRight className="h-4 w-4" /></Link></div>{loading ? <div className="mt-8"><LoadingSkeleton count={8} /></div> : latestDesigns.length > 0 ? <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">{latestDesigns.map((design) => <DesignCard key={design.id} design={design} />)}</div> : <div className="mt-8 rounded-2xl border border-dashed border-stone-300 bg-white p-12 text-center text-sm text-stone-500">No published designs are available yet.</div>}</div></section>
+      <section className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
+        <SectionHeading eyebrow="Garment and textile segments" title="Browse popular categories" link="/explore" linkLabel="Explore all categories" />
+        {loading ? (
+          <div className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-4">{Array.from({ length: 8 }).map((_, index) => <div key={index} className="h-32 animate-pulse rounded-xl bg-stone-100" />)}</div>
+        ) : (filters?.categories ?? []).length > 0 ? (
+          <div className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-4">
+            {(filters?.categories ?? []).slice(0, 8).map((category) => (
+              <Link key={category.id} to={`/explore?category=${encodeURIComponent(category.id)}`} className="group rounded-xl border border-stone-200/90 bg-white p-4 transition hover:-translate-y-0.5 hover:border-stone-400 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-700 focus-visible:ring-offset-2">
+                <div className="mb-4 flex items-center justify-between">
+                  <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-50 font-serif text-sm font-bold text-amber-900">{category.name.charAt(0).toUpperCase()}</span>
+                  <ChevronRight className="h-4 w-4 text-stone-400 transition group-hover:translate-x-0.5 group-hover:text-amber-800" aria-hidden="true" />
+                </div>
+                <h3 className="font-serif text-base font-semibold text-stone-950 group-hover:text-amber-900">{category.name}</h3>
+                <p className="mt-1 text-xs text-stone-500">Explore matching designs</p>
+              </Link>
+            ))}
+          </div>
+        ) : (
+          <EmptySection copy="No active categories are available yet." />
+        )}
+      </section>
 
-      <section className="border-y border-stone-200 bg-white py-14"><div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8"><div><p className="text-xs font-bold uppercase tracking-[0.18em] text-amber-800">Textile categories</p><h2 className="mt-2 font-serif text-3xl font-semibold text-stone-950">Browse by category</h2></div><div className="mt-7 flex flex-wrap gap-3">{(filters?.categories ?? []).slice(0, 12).map((category) => <Link key={category.id} to={`/explore?category=${encodeURIComponent(category.id)}`} className="rounded-full border border-stone-300 bg-white px-4 py-2.5 text-sm font-medium text-stone-700 transition hover:border-amber-400 hover:bg-amber-50 hover:text-amber-950">{category.name}</Link>)}</div></div></section>
+      <section className="border-y border-stone-200 bg-white py-14">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <SectionHeading eyebrow="Recently published" title="Latest production designs" link="/explore" linkLabel="View all designs" />
+          {loading ? (
+            <div className="mt-8"><LoadingSkeleton count={8} /></div>
+          ) : latestDesigns.length > 0 ? (
+            <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">{latestDesigns.slice(0, 8).map((design) => <DesignCard key={design.id} design={design} />)}</div>
+          ) : (
+            <EmptySection copy="No published designs are available yet." />
+          )}
+        </div>
+      </section>
 
-      {(loading || folderCards.length > 0) && <section className="py-14 sm:py-18"><div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8"><div className="flex items-end justify-between gap-4"><div><p className="text-xs font-bold uppercase tracking-[0.18em] text-amber-800">Design folders</p><h2 className="mt-2 font-serif text-3xl font-semibold text-stone-950">Browse grouped design files</h2></div><Link to="/collections" className="hidden items-center gap-1 text-sm font-semibold text-stone-700 hover:text-amber-900 sm:flex">View folders <ArrowRight className="h-4 w-4" /></Link></div>{loading ? <div className="mt-8"><LoadingSkeleton count={3} /></div> : <div className="mt-8 grid gap-5 md:grid-cols-3">{folderCards.map((folder) => <CollectionCard key={folder.id} collection={folder} />)}</div>}</div></section>}
+      {(loading || folderCards.length > 0) && (
+        <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
+          <SectionHeading eyebrow="Design folders" title="Browse grouped design files" link="/collections" linkLabel="View all folders" />
+          <p className="mt-2 max-w-2xl text-sm text-stone-500">Explore purchasable design archives with file previews and server-provided pricing.</p>
+          {loading ? <div className="mt-8"><LoadingSkeleton count={3} /></div> : <div className="mt-8 grid gap-6 md:grid-cols-3">{folderCards.map((folder) => <CollectionCard key={folder.id} collection={folder} />)}</div>}
+        </section>
+      )}
 
-      <section className="bg-stone-950 py-16 text-white"><div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8"><div className="grid gap-8 lg:grid-cols-[0.8fr_1.2fr] lg:items-start"><div><p className="text-xs font-bold uppercase tracking-[0.18em] text-amber-300">How it works</p><h2 className="mt-3 font-serif text-3xl font-semibold sm:text-4xl">A clear path from discovery to download.</h2></div><div className="grid gap-4 sm:grid-cols-3">{[['01', 'Find', 'Search and filter the live catalog.'], ['02', 'Review', 'Check machine and specification details.'], ['03', 'Purchase', 'Pay securely and receive a protected download.']].map(([step, title, copy]) => <div key={step} className="rounded-2xl border border-stone-700 bg-stone-900 p-5"><span className="font-mono text-xs text-amber-300">{step}</span><h3 className="mt-3 font-serif text-xl font-semibold">{title}</h3><p className="mt-2 text-sm leading-6 text-stone-400">{copy}</p></div>)}</div></div><div className="mt-12 flex flex-col justify-between gap-5 rounded-2xl border border-stone-700 bg-stone-900 p-6 sm:flex-row sm:items-center"><div><h3 className="font-serif text-2xl font-semibold">Share your textile designs</h3><p className="mt-2 max-w-2xl text-sm text-stone-400">Buyer checkout is live. Seller studio mutations will be connected in Phase 5.</p></div><Link to={user.isLoggedIn && user.role === 'seller' ? '/studio' : '/auth'} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-amber-300 px-5 py-3 text-sm font-bold text-stone-950 hover:bg-amber-200">{user.isLoggedIn && user.role === 'seller' ? <Store className="h-4 w-4" /> : <UploadCloud className="h-4 w-4" />}{user.isLoggedIn && user.role === 'seller' ? 'Open preview studio' : 'Sign in or register'}</Link></div></div></section>
+      {!loading && (todayDesigns.length > 0 || tomorrowDesigns.length > 0) && (
+        <section className="border-y border-stone-200 bg-white py-16">
+          <div className="mx-auto grid max-w-7xl gap-12 px-4 sm:px-6 lg:grid-cols-2 lg:px-8">
+            <FeedColumn eyebrow="Available today" title="Today's designs" designs={todayDesigns} viewAll="/explore?section=today" />
+            <FeedColumn eyebrow="Coming next" title="Tomorrow's designs" designs={tomorrowDesigns} viewAll="/explore?section=tomorrow" />
+          </div>
+        </section>
+      )}
+
+      <section className="bg-stone-950 py-16 text-stone-200">
+        <div className="mx-auto grid max-w-7xl gap-12 px-4 sm:px-6 lg:grid-cols-2 lg:items-center lg:px-8">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-amber-300">For buyers and manufacturers</p>
+            <h2 className="mt-3 font-serif text-3xl font-semibold text-white sm:text-4xl">A clear path from discovery to download.</h2>
+            <div className="mt-8 space-y-4">
+              {[
+                ['1', 'Discover', 'Filter the live catalog by machine and production specifications.'],
+                ['2', 'Review', 'Check available images, design-type details, file type and server price.'],
+                ['3', 'Purchase', 'Complete checkout and receive protected downloads after payment confirmation.'],
+              ].map(([step, title, copy]) => (
+                <div key={step} className="flex gap-4 rounded-xl border border-stone-700 bg-stone-900 p-4">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-stone-800 font-mono text-sm font-bold text-amber-300">{step}</span>
+                  <div><h3 className="font-semibold text-white">{title}</h3><p className="mt-1 text-sm leading-6 text-stone-400">{copy}</p></div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-stone-700 bg-gradient-to-br from-stone-900 to-stone-800 p-7 sm:p-9">
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-amber-300">For textile creators</p>
+            <h2 className="mt-3 font-serif text-3xl font-semibold text-white">Share and manage your design catalog.</h2>
+            <p className="mt-4 text-sm leading-7 text-stone-300">Use My Studio to create designs and folders, manage your records, review seller earnings and follow the settlement mode configured for your account.</p>
+            <div className="mt-7 grid grid-cols-2 gap-3 text-sm">
+              <div className="rounded-xl border border-stone-700 bg-stone-950/60 p-4"><Sparkles className="h-5 w-5 text-amber-300" /><p className="mt-3 font-semibold text-white">Catalog tools</p><p className="mt-1 text-xs text-stone-400">Designs and folders</p></div>
+              <div className="rounded-xl border border-stone-700 bg-stone-950/60 p-4"><Store className="h-5 w-5 text-amber-300" /><p className="mt-3 font-semibold text-white">Seller workspace</p><p className="mt-1 text-xs text-stone-400">Wallet and records</p></div>
+            </div>
+            <Link to={user.isLoggedIn && user.role === 'seller' ? '/studio' : '/auth'} className="mt-7 inline-flex items-center gap-2 rounded-xl bg-amber-300 px-5 py-3 text-sm font-bold text-stone-950 transition hover:bg-amber-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-200 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-900">
+              {user.isLoggedIn && user.role === 'seller' ? <Store className="h-4 w-4" /> : <UploadCloud className="h-4 w-4" />}
+              {user.isLoggedIn && user.role === 'seller' ? 'Open My Studio' : 'Sign in or register'}
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
+        </div>
+      </section>
     </main>
   );
 };
+
+const SectionHeading: React.FC<{
+  eyebrow: string;
+  title: string;
+  link: string;
+  linkLabel: string;
+  compact?: boolean;
+}> = ({ eyebrow, title, link, linkLabel, compact = false }) => (
+  <div className="flex items-end justify-between gap-4">
+    <div>
+      <p className="text-xs font-bold uppercase tracking-[0.18em] text-amber-800">{eyebrow}</p>
+      <h2 className={`${compact ? 'mt-1 text-2xl' : 'mt-2 text-3xl'} font-serif font-semibold text-stone-950`}>{title}</h2>
+    </div>
+    <Link to={link} className="hidden items-center gap-1 text-sm font-semibold text-stone-700 hover:text-amber-900 sm:inline-flex">{linkLabel} <ArrowRight className="h-4 w-4" /></Link>
+  </div>
+);
+
+const EmptySection: React.FC<{ copy: string }> = ({ copy }) => (
+  <div className="mt-8 rounded-2xl border border-dashed border-stone-300 bg-white p-10 text-center text-sm text-stone-500">{copy}</div>
+);
+
+const FeedColumn: React.FC<{
+  eyebrow: string;
+  title: string;
+  designs: DesignCardData[];
+  viewAll: string;
+}> = ({ eyebrow, title, designs, viewAll }) => (
+  <div>
+    <div className="mb-6 flex items-end justify-between gap-4 border-b border-stone-200 pb-4">
+      <div><p className="text-xs font-bold uppercase tracking-[0.16em] text-amber-800">{eyebrow}</p><h2 className="mt-1 font-serif text-2xl font-semibold text-stone-950">{title}</h2></div>
+      {designs.length > 0 && <Link to={viewAll} className="text-xs font-semibold text-stone-600 hover:text-amber-900">View all</Link>}
+    </div>
+    {designs.length > 0 ? <div className="space-y-4">{designs.slice(0, 3).map((design) => <DesignCard key={design.id} design={design} viewMode="list" />)}</div> : <div className="rounded-xl border border-dashed border-stone-300 p-8 text-center text-sm text-stone-500">No designs in this section yet.</div>}
+  </div>
+);

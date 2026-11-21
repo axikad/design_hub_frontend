@@ -1,6 +1,6 @@
 # DesignHub Home UI Restoration Roadmap
 
-Status: In progress — Browse by Machines is implemented locally; live deployment verification is pending
+Status: In progress — the supported AI Studio Home layout is restored locally; live deployment verification and future data contracts remain
 
 Last reviewed: 21 November 2026
 
@@ -91,7 +91,7 @@ Implementation notes:
 
 Priority: Second
 
-Status: Not started
+Status: Restored locally with live catalog data; live deployment verification pending
 
 Improve the current category pills using the useful card treatment from the AI Studio template.
 
@@ -112,7 +112,7 @@ Acceptance checklist:
 
 Priority: Third
 
-Status: Not started
+Status: Restored locally using Latest, Today and Tomorrow API sections; live deployment verification pending
 
 Restore more visual depth without duplicating the same records under fake marketing labels.
 
@@ -140,7 +140,7 @@ Acceptance checklist:
 
 Priority: Fourth
 
-Status: Basic live section exists; visual enhancement pending
+Status: Restored locally with live folder data; live deployment verification pending
 
 Keep the visually useful collection presentation but map it to real purchasable folders.
 
@@ -161,7 +161,7 @@ Acceptance checklist:
 
 Priority: Fifth
 
-Status: Basic version exists; content and styling enhancement pending
+Status: Restored locally with factual buyer steps; live deployment verification pending
 
 Keep this as approved static explanatory content:
 
@@ -175,7 +175,7 @@ Do not promise unsupported guarantees, universal file formats, refunds, or tax t
 
 Priority: Sixth
 
-Status: Basic version exists; enhancement pending
+Status: Restored locally with current authentication and seller-studio routing; live deployment verification pending
 
 Requirements:
 
@@ -244,11 +244,11 @@ A section is complete only when its content and actions work against the live AP
 
 ## Immediate next task
 
-Implement **Browse by Machines** end to end:
+Deploy and verify the restored Home page end to end:
 
-1. Confirm or add the public Machine listing/filter contract.
-2. Add the typed Machine response to the frontend API layer.
-3. Replace the Home Machine Type section with Machine cards.
-4. Add Machine selection to Explore and synchronize it with the URL.
-5. Build and test desktop, tablet, and mobile layouts.
-6. Deploy and verify with live catalog records.
+1. Pull the backend Machine-filter contract on the live server.
+2. Deploy the new frontend production build.
+3. Verify hero, Machines, Categories, Latest designs, folders and Today/Tomorrow sections with live records.
+4. Verify every Home link opens the intended filtered or detail page.
+5. Review desktop, tablet and mobile layouts and record any visual adjustments.
+6. Keep creator, rating, testimonial and popularity sections hidden until their real data contracts exist.

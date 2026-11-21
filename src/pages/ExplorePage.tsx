@@ -37,6 +37,7 @@ export const ExplorePage: React.FC = () => {
   const [reloadKey, setReloadKey] = useState(0);
 
   const queryKey = searchParams.toString();
+  const selectedSection = searchParams.get('section') || '';
   const selectedMachine = searchParams.get('machine') || '';
   const selectedMachineType = searchParams.get('machineType') || '';
   const selectedCategories = searchParams.getAll('category');
@@ -68,6 +69,7 @@ export const ExplorePage: React.FC = () => {
     marketplaceApi.designs({
       page: currentPage,
       per_page: 12,
+      section: selectedSection || undefined,
       search: searchParams.get('q') || undefined,
       machine_id: selectedMachine || undefined,
       machine_type_id: selectedMachineType || undefined,
@@ -150,7 +152,7 @@ export const ExplorePage: React.FC = () => {
     setSingle('q', localSearch.trim());
   };
 
-  const activeCount = [selectedMachine, selectedMachineType, ...selectedCategories, ...selectedDesignTypes, ...selectedStitches, ...selectedNeedles, ...selectedAreas, searchParams.get('q') || ''].filter(Boolean).length;
+  const activeCount = [selectedSection, selectedMachine, selectedMachineType, ...selectedCategories, ...selectedDesignTypes, ...selectedStitches, ...selectedNeedles, ...selectedAreas, searchParams.get('q') || ''].filter(Boolean).length;
 
   const filterPanel = (
     <div className="space-y-6">
