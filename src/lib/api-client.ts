@@ -15,6 +15,15 @@ import type {
   PurchaseEnvelope,
   SavedDesignEnvelope,
 } from '../types/account';
+import type {
+  CheckoutItemType,
+  CheckoutOrder,
+  CheckoutPreview,
+  DesignDownloadGrant,
+  FolderDownloadGrant,
+  PaymentVerification,
+  PurchaseStatus,
+} from '../types/commerce';
 
 const configuredBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim();
 export const API_BASE_URL = (configuredBaseUrl || 'https://app.designshub.org/api/v1').replace(/\/$/, '');
@@ -149,6 +158,26 @@ export const accountApi = {
   unsaveDesign: (id: string) => apiRequest<ApiEnvelope<{ message: string }>>(`users/me/saved-designs/${encodeURIComponent(id)}`, { method: 'DELETE', authenticated: true }),
   purchases: (query: Query = {}, signal?: AbortSignal) => apiRequest<PurchaseEnvelope>('users/me/purchases', { query, signal, authenticated: true }),
   deleteAccount: () => apiRequest<ApiEnvelope<{ message: string }>>('users/me', { method: 'DELETE', body: { confirmation: 'DELETE' }, authenticated: true }),
+};
+
+const itemPayload = (type: CheckoutItemType, id: string) =>
+  type === 'design' ? { designId: id } : { folderId: id };
+
+export const commerceApi = {
+  checkoutPreview: (type: CheckoutItemType, id: string, signal?: AbortSignal) =>
+    apiRequest<ApiEnvelope<CheckoutPreview>>('payments/checkout-preview', { query: itemPayload(type, id), signal, authenticated: true }),
+  createOrder: (type: CheckoutItemType, id: string) =>
+    apiRequest<ApiEnvelope<CheckoutOrder>>('payments/orders', { method: 'POST', body: itemPayload(type, id), authenticated: true }),
+  verify: (type: CheckoutItemType, id: string, verification: PaymentVerification) =>
+    apiRequest<ApiEnvelope<PurchaseStatus>>('payments/verify', { method: 'POST', body: { ...itemPayload(type, id), ...verification }, authenticated: true }),
+  purchaseStatus: (type: CheckoutItemType, id: string, signal?: AbortSignal) =>
+    apiRequest<ApiEnvelope<PurchaseStatus>>(`purchases/${type === 'design' ? 'designs' : 'folders'}/${encodeURIComponent(id)}`, { signal, authenticated: true }),
+  downloadDesign: (id: string, file = 0) =>
+    apiRequest<ApiEnvelope<DesignDownloadGrant>>(`designs/${encodeURIComponent(id)}/download`, { method: 'POST', body: { file }, authenticated: true }),
+  downloadDesignImage: (id: string, imageIndex: number) =>
+    apiRequest<ApiEnvelope<DesignDownloadGrant>>(`designs/${encodeURIComponent(id)}/images/${imageIndex}/download`, { method: 'POST', authenticated: true }),
+  downloadFolder: (id: string) =>
+    apiRequest<ApiEnvelope<FolderDownloadGrant>>(`folders/${encodeURIComponent(id)}/download`, { method: 'POST', authenticated: true }),
 };
 
 export const getErrorMessage = (error: unknown) =>

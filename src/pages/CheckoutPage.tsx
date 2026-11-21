@@ -1,407 +1,161 @@
-import React, { useState } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
-import {
-  ShieldCheck,
-  Lock,
-  CheckCircle2,
-  AlertCircle,
-  RotateCcw,
-  Download,
-  ArrowRight,
-  Sparkles,
-  CreditCard,
-  QrCode,
-  Building2,
-  FileCheck
-} from 'lucide-react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { AlertCircle, ArrowLeft, CheckCircle2, Clock3, CreditCard, LoaderCircle, LockKeyhole, RefreshCw, ShieldCheck, Sparkles } from 'lucide-react';
+import { Link, useParams } from 'react-router-dom';
+import { ProtectedDownloadButton } from '../components/common/ProtectedDownloadButton';
 import { useApp } from '../context/AppContext';
-import { PurchaseRecord } from '../data/mockData';
+import { commerceApi, getErrorMessage } from '../lib/api-client';
+import { createRazorpay, loadRazorpay, type RazorpayFailureResponse, type RazorpaySuccessResponse } from '../lib/razorpay';
+import type { CheckoutItemType, CheckoutPreview, PurchaseStatus } from '../types/commerce';
+
+type ScreenState = 'loading' | 'ready' | 'creating' | 'gateway' | 'verifying' | 'pending' | 'paid' | 'error';
+
+const money = (paise: number, currency = 'INR') => new Intl.NumberFormat('en-IN', {
+  style: 'currency', currency, maximumFractionDigits: 2,
+}).format(paise / 100);
+const wait = (milliseconds: number) => new Promise((resolve) => window.setTimeout(resolve, milliseconds));
 
 export const CheckoutPage: React.FC = () => {
-  const { type, id } = useParams<{ type: 'design' | 'collection'; id: string }>();
-  const navigate = useNavigate();
-  const { designs, collections, addPurchase, showToast } = useApp();
+  const { type: rawType = 'design', id = '' } = useParams<{ type: string; id: string }>();
+  const type: CheckoutItemType = rawType === 'folder' || rawType === 'collection' ? 'folder' : 'design';
+  const { user, showToast, refreshAccountData } = useApp();
+  const [preview, setPreview] = useState<CheckoutPreview | null>(null);
+  const [purchase, setPurchase] = useState<PurchaseStatus | null>(null);
+  const [screen, setScreen] = useState<ScreenState>('loading');
+  const [error, setError] = useState('');
+  const [reloadKey, setReloadKey] = useState(0);
+  const activeRef = useRef(true);
 
-  // Find target item
-  const item =
-    type === 'collection'
-      ? collections.find((c) => c.id === id) || collections[0]
-      : designs.find((d) => d.id === id) || designs[0];
+  useEffect(() => {
+    activeRef.current = true;
+    return () => { activeRef.current = false; };
+  }, []);
 
-  const price = item.price;
-  // Phase 1 UI fixture only. The live total will come from checkout-preview.
-  const total = price;
+  const applyStatus = useCallback(async (status: PurchaseStatus) => {
+    if (!activeRef.current) return status;
+    setPurchase(status);
+    if (status.status === 'paid') {
+      setScreen('paid');
+      if (type === 'design') await refreshAccountData().catch(() => undefined);
+    } else if (status.status === 'pending') setScreen('pending');
+    else setScreen('ready');
+    return status;
+  }, [refreshAccountData, type]);
 
-  const [paymentMethod, setPaymentMethod] = useState<'upi' | 'card' | 'netbanking'>('upi');
-  const [upiId, setUpiId] = useState('manufacturer@okaxis');
-  const [checkoutState, setCheckoutState] = useState<'idle' | 'processing' | 'success' | 'failed'>('idle');
-  const [createdPurchase, setCreatedPurchase] = useState<PurchaseRecord | null>(null);
+  const reconcile = useCallback(async (silent = false) => {
+    if (!silent) { setError(''); setScreen('loading'); }
+    try {
+      const response = await commerceApi.purchaseStatus(type, id);
+      return await applyStatus(response.data);
+    } catch (requestError) {
+      if (!silent && activeRef.current) { setError(getErrorMessage(requestError)); setScreen('error'); }
+      return null;
+    }
+  }, [applyStatus, id, type]);
 
-  const handleSimulatePayment = (forceFail: boolean = false) => {
-    setCheckoutState('processing');
-    setTimeout(() => {
-      if (forceFail) {
-        setCheckoutState('failed');
-        showToast('Payment Unsuccessful', 'Bank server did not authorize transaction.', 'error');
-      } else {
-        const purchaseRecord = addPurchase(item, type === 'collection' ? 'collection' : 'design', total);
-        setCreatedPurchase(purchaseRecord);
-        setCheckoutState('success');
+  useEffect(() => {
+    const controller = new AbortController();
+    setScreen('loading'); setError(''); setPreview(null); setPurchase(null);
+    (async () => {
+      try {
+        const previewResponse = await commerceApi.checkoutPreview(type, id, controller.signal);
+        if (controller.signal.aborted) return;
+        setPreview(previewResponse.data);
+        const statusResponse = await commerceApi.purchaseStatus(type, id, controller.signal);
+        if (!controller.signal.aborted) await applyStatus(statusResponse.data);
+      } catch (requestError) {
+        if (requestError instanceof DOMException && requestError.name === 'AbortError') return;
+        if (activeRef.current) { setError(getErrorMessage(requestError)); setScreen('error'); }
       }
-    }, 1400);
+    })();
+    return () => controller.abort();
+  }, [applyStatus, id, reloadKey, type]);
+
+  const pollUntilSettled = useCallback(async () => {
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      const status = await reconcile(true);
+      if (!status || status.status === 'paid' || status.status === 'unpaid') return status;
+      await wait(1500);
+    }
+    if (activeRef.current) setScreen('pending');
+    return null;
+  }, [reconcile]);
+
+  const verifyPayment = useCallback(async (response: RazorpaySuccessResponse) => {
+    setScreen('verifying'); setError('');
+    try {
+      const verified = await commerceApi.verify(type, id, response);
+      await applyStatus(verified.data);
+      if (verified.data.status === 'paid') showToast('Payment successful', 'Your purchase is confirmed and the protected download is ready.', 'success');
+      else await pollUntilSettled();
+    } catch (requestError) {
+      const latest = await reconcile(true);
+      if (latest?.status !== 'paid' && activeRef.current) {
+        setError(getErrorMessage(requestError));
+        setScreen(latest?.status === 'pending' ? 'pending' : 'error');
+      }
+    }
+  }, [applyStatus, id, pollUntilSettled, reconcile, showToast, type]);
+
+  const beginPayment = async () => {
+    if (!preview || ['creating', 'gateway', 'verifying'].includes(screen)) return;
+    setScreen('creating'); setError('');
+    try {
+      await loadRazorpay();
+      const response = await commerceApi.createOrder(type, id);
+      const order = response.data;
+      setPreview(order.checkoutBreakdown);
+      let callbackStarted = false;
+      const razorpay = createRazorpay({
+        key: order.keyId, amount: order.amount, currency: order.currency, order_id: order.orderId,
+        name: 'Textile Design Hub', description: order.checkoutBreakdown.item.name,
+        prefill: { name: user.name, email: user.email || undefined, contact: user.phone || undefined },
+        theme: { color: '#1c1917' },
+        modal: { confirm_close: true, ondismiss: () => {
+          if (callbackStarted) return;
+          void (async () => {
+            const latest = await reconcile(true);
+            if (!latest || latest.status === 'unpaid') {
+              setScreen('ready');
+              showToast('Checkout closed', 'No confirmed payment was found. You can safely try again.', 'info');
+            }
+          })();
+        } },
+        handler: (payment) => { callbackStarted = true; void verifyPayment(payment); },
+      });
+      razorpay.on('payment.failed', (failure: RazorpayFailureResponse) => {
+        callbackStarted = true;
+        const message = failure.error?.description || failure.error?.reason || 'The payment was not completed.';
+        void (async () => {
+          const latest = await reconcile(true);
+          if (latest?.status !== 'paid') { setError(message); setScreen(latest?.status === 'pending' ? 'pending' : 'error'); }
+        })();
+      });
+      setScreen('gateway');
+      razorpay.open();
+    } catch (requestError) {
+      setError(getErrorMessage(requestError)); setScreen('error');
+    }
   };
 
-  // Payment Success Screen
-  if (checkoutState === 'success' && createdPurchase) {
-    return (
-      <div className="min-h-screen bg-[#FAF8F5] py-16 px-4">
-        <div className="max-w-xl mx-auto bg-white rounded-2xl border border-stone-200/90 p-8 shadow-md text-center space-y-6">
-          <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center mx-auto">
-            <CheckCircle2 className="w-10 h-10" />
-          </div>
+  const backPath = type === 'design' ? `/design/${id}` : `/collections/${id}`;
+  const taxLines = useMemo(() => preview?.taxes.lines ?? [], [preview]);
 
-          <div className="space-y-1">
-            <span className="text-xs font-semibold text-emerald-800 uppercase tracking-wider">
-              Payment Confirmed · Test Mode
-            </span>
-            <h1 className="font-serif text-2xl sm:text-3xl font-bold text-stone-900">
-              Files Ready for Production Download
-            </h1>
-            <p className="text-xs text-stone-500">
-              Order ID: <span className="font-mono font-bold text-stone-800">{createdPurchase.orderNumber}</span>
-            </p>
-          </div>
+  if (screen === 'loading' && !preview) return <CheckoutLoading />;
+  if (!preview) return <main className="mx-auto min-h-[60vh] max-w-xl px-4 py-16"><div className="rounded-2xl border border-rose-200 bg-rose-50 p-8 text-center text-rose-900"><AlertCircle className="mx-auto h-9 w-9" /><h1 className="mt-4 font-serif text-2xl font-semibold">Checkout unavailable</h1><p className="mt-2 text-sm leading-6">{error || 'The server could not prepare this checkout.'}</p><div className="mt-6 flex justify-center gap-3"><Link to={backPath} className="rounded-lg border border-rose-300 px-4 py-2 text-sm font-semibold">Go back</Link><button type="button" onClick={() => setReloadKey((value) => value + 1)} className="rounded-lg bg-rose-900 px-4 py-2 text-sm font-semibold text-white">Try again</button></div></div></main>;
+  const busy = ['creating', 'gateway', 'verifying', 'loading'].includes(screen);
 
-          <div className="p-4 bg-stone-50 rounded-xl border border-stone-200/80 text-left flex items-center gap-4">
-            <img
-              src={createdPurchase.itemImage}
-              alt={createdPurchase.itemTitle}
-              className="w-16 h-16 rounded-lg object-cover shrink-0"
-            />
-            <div className="flex-1 min-w-0">
-              <h4 className="font-serif text-sm font-bold text-stone-900 truncate">
-                {createdPurchase.itemTitle}
-              </h4>
-              <p className="text-xs text-stone-500">{createdPurchase.category} · {createdPurchase.sellerName}</p>
-              <p className="text-xs font-mono font-bold text-stone-900 mt-1">
-                ₹{createdPurchase.amountPaid.toLocaleString('en-IN')} Paid
-              </p>
-            </div>
-          </div>
-
-          {/* Download Action List */}
-          <div className="text-left space-y-2">
-            <h5 className="text-xs font-semibold text-stone-700 uppercase tracking-wider">
-              Instant Machine Downloads:
-            </h5>
-            <div className="divide-y divide-stone-100 bg-stone-50 rounded-xl p-3 border border-stone-200/60">
-              {createdPurchase.downloadUrls.map((dl, i) => (
-                <div key={i} className="py-2 flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-2">
-                    <FileCheck className="w-4 h-4 text-amber-800" />
-                    <span className="font-mono font-medium text-stone-800">{dl.filename}</span>
-                  </div>
-                  <button
-                    onClick={() => showToast('Downloading File', `Starting download of ${dl.filename}`, 'success')}
-                    className="text-emerald-800 hover:text-emerald-950 font-semibold flex items-center gap-1 text-xs"
-                  >
-                    <Download className="w-3.5 h-3.5" />
-                    Download ({dl.size})
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="pt-4 flex flex-col sm:flex-row gap-3">
-            <Link
-              to="/account/purchases"
-              className="flex-1 py-3 px-4 bg-stone-900 hover:bg-stone-800 text-white font-semibold rounded-xl text-xs transition-colors"
-            >
-              Go to My Purchases & Downloads
-            </Link>
-            <Link
-              to="/explore"
-              className="py-3 px-4 bg-stone-100 hover:bg-stone-200 text-stone-800 font-semibold rounded-xl text-xs transition-colors"
-            >
-              Browse More Designs
-            </Link>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Payment Failed Screen
-  if (checkoutState === 'failed') {
-    return (
-      <div className="min-h-screen bg-[#FAF8F5] py-16 px-4">
-        <div className="max-w-md mx-auto bg-white rounded-2xl border border-stone-200/90 p-8 shadow-md text-center space-y-6">
-          <div className="w-16 h-16 rounded-full bg-rose-100 text-rose-700 flex items-center justify-center mx-auto">
-            <AlertCircle className="w-10 h-10" />
-          </div>
-
-          <div className="space-y-1">
-            <span className="text-xs font-semibold text-rose-700 uppercase tracking-wider">
-              Transaction Failed
-            </span>
-            <h1 className="font-serif text-2xl font-bold text-stone-900">
-              Payment Could Not Be Processed
-            </h1>
-            <p className="text-xs text-stone-500">
-              No amount has been deducted. You can retry using another payment option or UPI ID.
-            </p>
-          </div>
-
-          <div className="p-4 bg-rose-50/60 rounded-xl border border-rose-200 text-left text-xs text-rose-900">
-            <strong>Error code:</strong> BANK_TIMEOUT_RETRY_ALLOWED. Your order remains pending in checkout.
-          </div>
-
-          <div className="flex flex-col gap-2 pt-2">
-            <button
-              onClick={() => handleSimulatePayment(false)}
-              className="w-full py-3 px-4 bg-stone-900 hover:bg-stone-800 text-white font-semibold rounded-xl text-xs flex items-center justify-center gap-2"
-            >
-              <RotateCcw className="w-4 h-4" />
-              Retry Payment (Razorpay Test Mode)
-            </button>
-            <button
-              onClick={() => setCheckoutState('idle')}
-              className="w-full py-2.5 text-xs font-semibold text-stone-600 hover:text-stone-900"
-            >
-              Change Payment Method
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Active Checkout Screen
-  return (
-    <div className="min-h-screen bg-[#FAF8F5] py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-4xl mx-auto space-y-8">
-        
-        {/* Test Mode Top Notice */}
-        <div className="bg-amber-50/90 border border-amber-200/90 p-4 rounded-xl flex items-center justify-between text-xs text-amber-900">
-          <div className="flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-amber-700 shrink-0" />
-            <span>
-              <strong>Marketplace Test Checkout:</strong> Simulated payments via Razorpay/UPI sandbox. No real money charged.
-            </span>
-          </div>
-          <span className="font-mono uppercase font-bold text-[10px] bg-amber-200/80 px-2 py-0.5 rounded">
-            Test Mode Active
-          </span>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
-          
-          {/* Left Column: Payment Options (7 cols) */}
-          <div className="md:col-span-7 bg-white rounded-2xl border border-stone-200/90 p-6 space-y-6">
-            <div className="flex items-center justify-between pb-3 border-b border-stone-100">
-              <h2 className="font-serif text-lg font-bold text-stone-900">
-                Payment Method
-              </h2>
-              <div className="flex items-center gap-1.5 text-xs text-stone-500">
-                <Lock className="w-3.5 h-3.5 text-emerald-700" />
-                <span>256-Bit Encrypted</span>
-              </div>
-            </div>
-
-            {/* Payment Method Selector */}
-            <div className="grid grid-cols-3 gap-3 text-xs">
-              <button
-                type="button"
-                onClick={() => setPaymentMethod('upi')}
-                className={`p-3 rounded-xl border text-center transition-all flex flex-col items-center gap-1.5 ${
-                  paymentMethod === 'upi'
-                    ? 'border-stone-900 bg-stone-900 text-white font-semibold shadow-xs'
-                    : 'border-stone-200 bg-stone-50 text-stone-700 hover:bg-stone-100'
-                }`}
-              >
-                <QrCode className="w-5 h-5" />
-                <span>UPI / QR</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setPaymentMethod('card')}
-                className={`p-3 rounded-xl border text-center transition-all flex flex-col items-center gap-1.5 ${
-                  paymentMethod === 'card'
-                    ? 'border-stone-900 bg-stone-900 text-white font-semibold shadow-xs'
-                    : 'border-stone-200 bg-stone-50 text-stone-700 hover:bg-stone-100'
-                }`}
-              >
-                <CreditCard className="w-5 h-5" />
-                <span>Debit / Card</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setPaymentMethod('netbanking')}
-                className={`p-3 rounded-xl border text-center transition-all flex flex-col items-center gap-1.5 ${
-                  paymentMethod === 'netbanking'
-                    ? 'border-stone-900 bg-stone-900 text-white font-semibold shadow-xs'
-                    : 'border-stone-200 bg-stone-50 text-stone-700 hover:bg-stone-100'
-                }`}
-              >
-                <Building2 className="w-5 h-5" />
-                <span>NetBanking</span>
-              </button>
-            </div>
-
-            {/* UPI Details */}
-            {paymentMethod === 'upi' && (
-              <div className="space-y-3 p-4 bg-stone-50 rounded-xl border border-stone-200/60 text-xs">
-                <label className="font-semibold text-stone-700 block">
-                  Enter VPA / UPI ID (Google Pay, PhonePe, Paytm, BHIM)
-                </label>
-                <input
-                  type="text"
-                  value={upiId}
-                  onChange={(e) => setUpiId(e.target.value)}
-                  placeholder="e.g. mobile@upi or name@okaxis"
-                  className="w-full p-2.5 bg-white border border-stone-300 rounded-lg text-stone-900 font-mono text-xs focus:outline-none focus:ring-1 focus:ring-amber-700"
-                />
-                <p className="text-[11px] text-stone-500">
-                  A payment authorization request will be simulated on your UPI app.
-                </p>
-              </div>
-            )}
-
-            {paymentMethod === 'card' && (
-              <div className="space-y-3 p-4 bg-stone-50 rounded-xl border border-stone-200/60 text-xs">
-                <div>
-                  <label className="font-semibold text-stone-700 block mb-1">Card Number (Sandbox)</label>
-                  <input
-                    type="text"
-                    disabled
-                    value="4111 ···· ···· 1111 (Visa Sandbox)"
-                    className="w-full p-2.5 bg-stone-100 border border-stone-300 rounded-lg text-stone-600 font-mono text-xs"
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="font-semibold text-stone-700 block mb-1">Expiry</label>
-                    <input
-                      type="text"
-                      disabled
-                      value="12 / 28"
-                      className="w-full p-2.5 bg-stone-100 border border-stone-300 rounded-lg text-stone-600 font-mono text-xs"
-                    />
-                  </div>
-                  <div>
-                    <label className="font-semibold text-stone-700 block mb-1">CVV</label>
-                    <input
-                      type="text"
-                      disabled
-                      value="888"
-                      className="w-full p-2.5 bg-stone-100 border border-stone-300 rounded-lg text-stone-600 font-mono text-xs"
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {paymentMethod === 'netbanking' && (
-              <div className="p-4 bg-stone-50 rounded-xl border border-stone-200/60 text-xs space-y-2">
-                <label className="font-semibold text-stone-700 block">Select Indian Bank</label>
-                <select className="w-full p-2.5 bg-white border border-stone-300 rounded-lg text-stone-800 text-xs">
-                  <option>HDFC Bank</option>
-                  <option>State Bank of India (SBI)</option>
-                  <option>ICICI Bank</option>
-                  <option>Axis Bank</option>
-                  <option>Kotak Mahindra Bank</option>
-                </select>
-              </div>
-            )}
-
-            {/* Action Buttons */}
-            <div className="space-y-2 pt-4">
-              <button
-                disabled={checkoutState === 'processing'}
-                onClick={() => handleSimulatePayment(false)}
-                className="w-full py-3.5 px-4 bg-stone-900 hover:bg-stone-800 disabled:opacity-50 text-white font-semibold rounded-xl text-xs flex items-center justify-center gap-2 shadow-md transition-all"
-              >
-                {checkoutState === 'processing' ? (
-                  <span className="flex items-center gap-2">
-                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    Authorizing Razorpay Gateway...
-                  </span>
-                ) : (
-                  <>
-                    <span>Pay ₹{total.toLocaleString('en-IN')} (Razorpay Sandbox)</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </>
-                )}
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleSimulatePayment(true)}
-                className="w-full py-2 text-[11px] text-stone-400 hover:text-stone-600 text-center font-medium"
-              >
-                Simulate Gateway Timeout Failure (Test Retry Flow)
-              </button>
-            </div>
-
-            {/* Checkout status note */}
-            <div className="pt-4 border-t border-stone-100 flex items-center gap-3 text-xs text-stone-500">
-              <ShieldCheck className="w-4 h-4 text-emerald-700 shrink-0" />
-              <span>
-                This is a checkout preview. Payment status and download access will be confirmed by the server after integration.
-              </span>
-            </div>
-
-          </div>
-
-          {/* Right Column: Order Summary (5 cols) */}
-          <div className="md:col-span-5 bg-white rounded-2xl border border-stone-200/90 p-6 space-y-6">
-            <h3 className="font-serif text-base font-bold text-stone-900 pb-3 border-b border-stone-100">
-              Order Summary
-            </h3>
-
-            {/* Item Card */}
-            <div className="flex gap-4 items-start">
-              <img
-                src={'coverImage' in item ? item.coverImage : item.images[0]}
-                alt={item.title}
-                className="w-20 h-20 rounded-xl object-cover bg-stone-100 shrink-0 border border-stone-200"
-              />
-              <div className="flex-1 min-w-0 space-y-1">
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-amber-900 block truncate">
-                  {item.category}
-                </span>
-                <h4 className="font-serif text-sm font-bold text-stone-900 line-clamp-2">
-                  {item.title}
-                </h4>
-                <p className="text-xs text-stone-500 truncate">By {item.sellerName}</p>
-              </div>
-            </div>
-
-            {/* Price Calculations */}
-            <div className="space-y-2 pt-4 border-t border-stone-100 text-xs">
-              <div className="flex justify-between text-stone-600">
-                <span>Item price</span>
-                <span className="font-mono tabular-nums">₹{price.toLocaleString('en-IN')}</span>
-              </div>
-              <div className="pt-2 border-t border-stone-200 flex justify-between font-bold text-sm text-stone-900">
-                <span>Total Amount Due</span>
-                <span className="font-mono tabular-nums text-base">
-                  ₹{total.toLocaleString('en-IN')}
-                </span>
-              </div>
-            </div>
-
-            <div className="p-3 bg-stone-50 rounded-xl border border-stone-200/60 text-[11px] text-stone-500">
-              The final live amount and any applicable breakdown will be supplied by the checkout service before payment.
-            </div>
-
-          </div>
-
-        </div>
-      </div>
-    </div>
-  );
+  return <main className="min-h-screen bg-[#FAF8F5] px-4 py-10 sm:px-6 lg:px-8"><div className="mx-auto max-w-4xl space-y-6">
+    <Link to={backPath} className="inline-flex items-center gap-2 text-sm font-semibold text-stone-600 hover:text-stone-950"><ArrowLeft className="h-4 w-4" />Back to {type === 'design' ? 'design' : 'folder'}</Link>
+    {preview.isTestMode && <div className="flex flex-col gap-2 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950 sm:flex-row sm:items-center sm:justify-between"><span className="inline-flex items-center gap-2"><Sparkles className="h-4 w-4" /><strong>Test mode:</strong> No real money will be transferred.</span><span className="w-fit rounded-full bg-amber-200 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider">{preview.paymentEnvironment}</span></div>}
+    {screen === 'paid' ? <PaidCheckout type={type} id={id} preview={preview} purchase={purchase} /> : <div className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
+      <section className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm sm:p-8"><div className="flex items-start justify-between gap-4"><div><p className="text-xs font-bold uppercase tracking-[0.18em] text-amber-800">Secure checkout</p><h1 className="mt-2 font-serif text-3xl font-semibold text-stone-950">Complete your purchase</h1></div><LockKeyhole className="h-6 w-6 text-emerald-700" /></div><div className="mt-7 rounded-xl border border-stone-200 bg-stone-50 p-5"><p className="text-xs uppercase tracking-wider text-stone-500">{preview.item.type}</p><h2 className="mt-2 font-serif text-xl font-semibold text-stone-950">{preview.item.name}</h2></div>
+        {screen === 'pending' && <div className="mt-5 rounded-xl border border-sky-200 bg-sky-50 p-4 text-sm text-sky-950"><p className="flex items-center gap-2 font-semibold"><Clock3 className="h-4 w-4" />Payment confirmation is pending</p><p className="mt-1 text-xs leading-5 text-sky-800">Do not pay again yet. Ask the server to check Razorpay for the latest status.</p></div>}
+        {error && <div className="mt-5 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900"><p className="flex items-center gap-2 font-semibold"><AlertCircle className="h-4 w-4" />Payment was not completed</p><p className="mt-1 text-xs leading-5">{error}</p></div>}
+        <div className="mt-6 space-y-3"><button type="button" onClick={() => void beginPayment()} disabled={busy || screen === 'pending'} className="flex w-full items-center justify-center gap-2 rounded-xl bg-stone-950 px-5 py-3.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60">{busy ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <CreditCard className="h-4 w-4" />}{screen === 'creating' ? 'Creating secure order…' : screen === 'gateway' ? 'Razorpay is open…' : screen === 'verifying' ? 'Verifying payment…' : `Pay ${money(preview.totalPayablePaise, preview.currency)} with Razorpay`}</button>{screen === 'pending' && <button type="button" onClick={() => void reconcile()} className="flex w-full items-center justify-center gap-2 rounded-xl border border-stone-300 px-5 py-3 text-sm font-semibold text-stone-800"><RefreshCw className="h-4 w-4" />Check payment status</button>}{screen === 'error' && <button type="button" onClick={() => { setError(''); setScreen('ready'); }} className="w-full rounded-xl border border-stone-300 px-5 py-3 text-sm font-semibold text-stone-800">Try checkout again</button>}</div><p className="mt-5 flex items-start gap-2 text-xs leading-5 text-stone-500"><ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-700" />Your final amount and payment result come directly from the server and Razorpay. DesignHub never stores card or UPI credentials.</p></section>
+      <aside className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm"><h2 className="font-serif text-xl font-semibold text-stone-950">Order summary</h2><dl className="mt-6 space-y-3 text-sm"><div className="flex justify-between gap-4 text-stone-600"><dt>Item price</dt><dd className="font-mono text-stone-900">{money(preview.itemPricePaise, preview.currency)}</dd></div>{taxLines.map((line, index) => <div key={index} className="flex justify-between gap-4 text-stone-600"><dt>{line.label || line.name || `Tax ${index + 1}`}</dt><dd className="font-mono text-stone-900">{money(line.amountPaise, preview.currency)}</dd></div>)}{preview.taxes.enabled && taxLines.length === 0 && <div className="flex justify-between gap-4 text-stone-600"><dt>Taxes</dt><dd className="font-mono text-stone-900">{money(preview.taxes.totalPaise, preview.currency)}</dd></div>}{preview.buyerFee.enabled && <div className="flex justify-between gap-4 text-stone-600"><dt>Buyer fee</dt><dd className="font-mono text-stone-900">{money(preview.buyerFee.amountPaise, preview.currency)}</dd></div>}<div className="flex justify-between gap-4 border-t border-stone-200 pt-4 text-base font-bold text-stone-950"><dt>Total payable</dt><dd className="font-mono">{money(preview.totalPayablePaise, preview.currency)}</dd></div></dl><div className="mt-6 rounded-xl bg-stone-50 p-4 text-xs leading-5 text-stone-600">{preview.notice}</div></aside>
+    </div>}
+  </div></main>;
 };
+
+const PaidCheckout: React.FC<{ type: CheckoutItemType; id: string; preview: CheckoutPreview; purchase: PurchaseStatus | null }> = ({ type, id, preview, purchase }) => <section className="rounded-2xl border border-emerald-200 bg-white p-8 text-center shadow-sm"><CheckCircle2 className="mx-auto h-14 w-14 text-emerald-600" /><p className="mt-4 text-xs font-bold uppercase tracking-[0.18em] text-emerald-700">Payment confirmed</p><h1 className="mt-2 font-serif text-3xl font-semibold text-stone-950">Your files are ready</h1><p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-stone-600">{preview.item.name} is linked to your account. Download links are generated securely and expire after a short time.</p><div className="mt-7 flex flex-col justify-center gap-3 sm:flex-row"><ProtectedDownloadButton type={type} id={id} label={type === 'design' ? 'Download stitch file' : 'Download folder archive'} className="inline-flex items-center justify-center gap-2 rounded-xl bg-stone-950 px-5 py-3 text-sm font-semibold text-white" />{type === 'design' && <Link to="/account/purchases" className="rounded-xl border border-stone-300 px-5 py-3 text-sm font-semibold text-stone-800">View purchases</Link>}</div>{purchase?.purchaseId && <p className="mt-5 font-mono text-xs text-stone-400">Purchase {purchase.purchaseId}</p>}</section>;
+const CheckoutLoading = () => <main className="mx-auto min-h-[60vh] max-w-4xl px-4 py-12"><div className="grid animate-pulse gap-6 lg:grid-cols-[1.15fr_0.85fr]"><div className="h-96 rounded-2xl border border-stone-200 bg-white" /><div className="h-72 rounded-2xl border border-stone-200 bg-white" /></div></main>;

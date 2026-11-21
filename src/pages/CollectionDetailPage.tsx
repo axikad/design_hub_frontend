@@ -1,21 +1,27 @@
 import React, { useEffect, useState } from 'react';
-import { AlertCircle, Archive, ExternalLink, File, LockKeyhole } from 'lucide-react';
-import { Link, useParams, useSearchParams } from 'react-router-dom';
+import { AlertCircle, Archive, CheckCircle2, ExternalLink, File, LockKeyhole, ShoppingBag } from 'lucide-react';
+import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom';
+import { ProtectedDownloadButton } from '../components/common/ProtectedDownloadButton';
 import { EmptyState } from '../components/common/EmptyState';
-import { getErrorMessage, marketplaceApi } from '../lib/api-client';
+import { useApp } from '../context/AppContext';
+import { commerceApi, getErrorMessage, marketplaceApi } from '../lib/api-client';
 import { formatBytes, normalizeAssetUrl } from '../lib/marketplace-mappers';
+import type { PurchaseStatus } from '../types/commerce';
 import type { ApiFolder, PaginationMeta } from '../types/marketplace';
 
 const inr = (paise: number) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(paise / 100);
 
 export const CollectionDetailPage: React.FC = () => {
   const { id = '' } = useParams<{ id: string }>();
+  const location = useLocation();
+  const { user } = useApp();
   const [searchParams, setSearchParams] = useSearchParams();
   const [folder, setFolder] = useState<ApiFolder | null>(null);
   const [meta, setMeta] = useState<PaginationMeta | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [reloadKey, setReloadKey] = useState(0);
+  const [purchase, setPurchase] = useState<PurchaseStatus | null>(null);
   const page = Math.max(1, Number(searchParams.get('page') || 1));
 
   useEffect(() => {
@@ -38,6 +44,15 @@ export const CollectionDetailPage: React.FC = () => {
     return () => controller.abort();
   }, [id, page, reloadKey]);
 
+  useEffect(() => {
+    if (!user.isLoggedIn) { setPurchase(null); return; }
+    const controller = new AbortController();
+    commerceApi.purchaseStatus('folder', id, controller.signal)
+      .then((response) => setPurchase(response.data))
+      .catch(() => setPurchase(null));
+    return () => controller.abort();
+  }, [id, user.isLoggedIn]);
+
   const changePage = (nextPage: number) => {
     const next = new URLSearchParams(searchParams);
     next.set('page', String(nextPage));
@@ -55,7 +70,9 @@ export const CollectionDetailPage: React.FC = () => {
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         <section className="grid gap-8 rounded-2xl border border-stone-200 bg-white p-6 shadow-sm lg:grid-cols-[22rem_1fr] lg:p-8">
           <div className="aspect-[4/3] overflow-hidden rounded-xl border border-stone-200 bg-stone-100">{cover ? <img src={cover} alt={`${folder.name} folder preview`} className="h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center"><Archive className="h-12 w-12 text-stone-300" /></div>}</div>
-          <div className="flex flex-col justify-center"><p className="text-xs font-bold uppercase tracking-[0.18em] text-amber-800">Design archive</p><h1 className="mt-2 font-serif text-3xl font-bold text-stone-950">{folder.name}</h1><dl className="mt-6 grid gap-4 text-sm sm:grid-cols-3"><div><dt className="text-stone-500">Folder price</dt><dd className="mt-1 font-mono text-xl font-bold text-stone-950">{inr(folder.pricePaise)}</dd></div><div><dt className="text-stone-500">Files</dt><dd className="mt-1 font-semibold text-stone-900">{folder.fileCount.toLocaleString('en-IN')}</dd></div><div><dt className="text-stone-500">Total size</dt><dd className="mt-1 font-semibold text-stone-900">{formatBytes(folder.totalSize)}</dd></div></dl><div className="mt-7 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950"><p className="inline-flex items-center gap-2 font-semibold"><LockKeyhole className="h-4 w-4" />Purchase and download integration follows in the checkout phase.</p><p className="mt-1 text-xs text-amber-800">The folder metadata and previews shown here are live server data.</p></div></div>
+          <div className="flex flex-col justify-center"><p className="text-xs font-bold uppercase tracking-[0.18em] text-amber-800">Design archive</p><h1 className="mt-2 font-serif text-3xl font-bold text-stone-950">{folder.name}</h1><dl className="mt-6 grid gap-4 text-sm sm:grid-cols-3"><div><dt className="text-stone-500">Folder price</dt><dd className="mt-1 font-mono text-xl font-bold text-stone-950">{inr(folder.pricePaise)}</dd></div><div><dt className="text-stone-500">Files</dt><dd className="mt-1 font-semibold text-stone-900">{folder.fileCount.toLocaleString('en-IN')}</dd></div><div><dt className="text-stone-500">Total size</dt><dd className="mt-1 font-semibold text-stone-900">{formatBytes(folder.totalSize)}</dd></div></dl>
+            {purchase?.status === 'paid' ? <div className="mt-7 space-y-3"><div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-950"><p className="inline-flex items-center gap-2 font-semibold"><CheckCircle2 className="h-4 w-4" />Purchased and ready</p><p className="mt-1 text-xs text-emerald-800">The server will create a fresh protected archive link.</p></div><ProtectedDownloadButton type="folder" id={folder.id} label="Download folder archive" className="flex w-full items-center justify-center gap-2 rounded-xl bg-stone-950 px-4 py-3 text-sm font-semibold text-white" /></div> : user.isLoggedIn ? <Link to={`/checkout/folder/${folder.id}`} className="mt-7 flex w-full items-center justify-center gap-2 rounded-xl bg-stone-950 px-4 py-3 text-sm font-semibold text-white"><ShoppingBag className="h-4 w-4" />Buy folder securely</Link> : <Link to="/auth" state={{ returnTo: `${location.pathname}${location.search}` }} className="mt-7 flex w-full items-center justify-center gap-2 rounded-xl bg-stone-950 px-4 py-3 text-sm font-semibold text-white"><LockKeyhole className="h-4 w-4" />Sign in to purchase</Link>}
+          </div>
         </section>
 
         <section className="mt-10"><div className="flex items-end justify-between"><div><p className="text-xs font-bold uppercase tracking-[0.18em] text-amber-800">Archive contents</p><h2 className="mt-2 font-serif text-2xl font-semibold text-stone-950">Files in this folder</h2></div>{meta && <p className="text-sm text-stone-500">{meta.from ?? 0}–{meta.to ?? 0} of {meta.total}</p>}</div>

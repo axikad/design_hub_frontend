@@ -68,7 +68,7 @@ export default function App() {
         <div className="flex flex-col min-h-screen text-stone-900 bg-[#FAF8F5]">
           <Header />
           <div className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-center text-[11px] font-medium text-amber-950">
-            Live marketplace catalog and buyer accounts · Checkout, downloads and studio mutations follow in the next phases.
+            Live marketplace catalog, secure Razorpay checkout and protected buyer downloads
           </div>
           <div className="flex-1">
             <Suspense fallback={<PageLoading />}>

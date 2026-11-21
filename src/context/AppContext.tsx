@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useCallback, useContext, useState, useEffect } from 'react';
 import {
   DesignItem,
   CollectionItem,
@@ -85,6 +85,7 @@ interface AppContextType {
   updateUserProfile: (updates: Partial<UserProfile>) => void;
   establishSession: (result: AuthResult) => Promise<void>;
   refreshUser: () => Promise<void>;
+  refreshAccountData: () => Promise<void>;
   logout: () => Promise<void>;
   searchQuery: string;
   setSearchQuery: (query: string) => void;
@@ -200,14 +201,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setToasts((prev) => prev.filter((t) => t.id !== id));
   };
 
-  const loadAccountCollections = async () => {
+  const loadAccountCollections = useCallback(async () => {
     const [saved, paid] = await Promise.all([
       accountApi.savedDesigns({ page: 1, per_page: 100 }),
       accountApi.purchases({ page: 1, per_page: 100 }),
     ]);
     setSavedDesignIds(saved.data.map((design) => design.id));
     setPurchases(paid.data.map(mapPurchase));
-  };
+  }, []);
 
   const refreshUser = async () => {
     const response = await authApi.me();
@@ -526,6 +527,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateUserProfile,
         establishSession,
         refreshUser,
+        refreshAccountData: loadAccountCollections,
         logout,
         searchQuery,
         setSearchQuery,

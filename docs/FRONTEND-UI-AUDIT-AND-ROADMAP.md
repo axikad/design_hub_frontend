@@ -404,6 +404,15 @@ Implementation status (20 November 2026): implemented and build-verified.
 
 Exit condition: test-mode purchase works end to end without client-side price authority.
 
+Implementation status (20 November 2026): implemented and build-verified; one live test-mode transaction remains for deployment acceptance.
+
+- Replaced the simulated checkout with the backend checkout preview, server-created Razorpay order and signature verification flow.
+- Added safe `unpaid`, `pending` and `paid` states, provider reconciliation after dismiss/failure and an explicit status retry action.
+- The UI renders item price, server tax lines, buyer fee and final total exclusively from the backend response.
+- Connected protected stitch-file, original-image and folder-archive downloads using short-lived signed links.
+- Design details, folder details and buyer purchase history now expose the correct checkout or download action for the current account.
+- Razorpay credentials remain server-owned; the browser receives only the public checkout key and never determines payment success locally.
+
 ### Phase 5 — Seller studio
 
 - Integrate own designs, dynamic create/edit form, uploads and deletion.
