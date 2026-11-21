@@ -34,6 +34,8 @@ The mobile home currently provides this useful hierarchy:
 
 The website should use the same catalog meaning and live records, while keeping a layout designed for desktop and responsive web rather than copying the mobile screen literally.
 
+Image search status: restored on the Home hero using the authenticated `POST /api/v1/designs/search-by-image` contract. Guests receive a sign-in prompt; signed-in users can upload JPG, PNG or WebP files up to 10 MB and open matching designs from the result cards.
+
 ## Important catalog rule
 
 The catalog hierarchy is:
@@ -226,7 +228,6 @@ Do not infer popularity in the browser. Restore these sections only after the ba
 - Claims that every purchase contains fixed formats such as EMB, DST, and PES.
 - Fixed seller payout percentages or fixed settlement frequency.
 - Fake discounts, original prices, or savings percentages.
-- Image search until the product decision and search service are finalized.
 
 ## Implementation rule for every restored section
 

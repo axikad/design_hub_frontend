@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   AlertCircle,
   ArrowRight,
+  Camera,
   CheckCircle2,
   ChevronRight,
   Cpu,
@@ -14,6 +15,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { CollectionCard } from '../components/common/CollectionCard';
 import { DesignCard } from '../components/common/DesignCard';
 import { LoadingSkeleton } from '../components/common/LoadingSkeleton';
+import { SearchByImageModal } from '../components/common/SearchByImageModal';
 import { useApp } from '../context/AppContext';
 import heroImage from '../assets/images/hero_textile_embroidery_1793879816875.jpg';
 import { getErrorMessage, marketplaceApi } from '../lib/api-client';
@@ -28,6 +30,7 @@ export const HomePage: React.FC = () => {
   const [folders, setFolders] = useState<ApiFolder[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
+  const [imageSearchOpen, setImageSearchOpen] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const navigate = useNavigate();
 
@@ -81,6 +84,7 @@ export const HomePage: React.FC = () => {
 
   return (
     <main className="min-h-screen bg-[#FAF8F5]">
+      <SearchByImageModal isOpen={imageSearchOpen} onClose={() => setImageSearchOpen(false)} />
       <section className="relative overflow-hidden border-b border-stone-200/80 bg-gradient-to-b from-[#F5F2EB] to-[#FAF8F5] py-12 lg:py-20">
         <div className="mx-auto grid max-w-7xl grid-cols-1 items-center gap-12 px-4 sm:px-6 lg:grid-cols-12 lg:px-8">
           <div className="space-y-6 lg:col-span-7">
@@ -110,6 +114,10 @@ export const HomePage: React.FC = () => {
                     className="w-full bg-transparent px-3 py-3 text-sm text-stone-950 outline-none placeholder:text-stone-400"
                   />
                 </div>
+                <button type="button" onClick={() => setImageSearchOpen(true)} className="inline-flex items-center justify-center gap-2 rounded-lg px-4 py-3 text-sm font-semibold text-stone-600 transition hover:bg-amber-50 hover:text-amber-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-700 focus-visible:ring-offset-2">
+                  <Camera className="h-4 w-4 text-amber-700" aria-hidden="true" />
+                  Swatch Match
+                </button>
                 <button type="submit" className="rounded-lg bg-stone-950 px-6 py-3 text-sm font-semibold text-white transition hover:bg-amber-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-700 focus-visible:ring-offset-2">
                   Explore designs
                 </button>

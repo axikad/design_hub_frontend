@@ -84,6 +84,17 @@ export interface ApiHomeData {
   }>;
 }
 
+export interface ApiImageSearchResult extends ApiDesign {
+  similarityScore: number;
+  similarityLabel: 'Very close' | 'Similar' | 'Related' | string;
+}
+
+export interface ApiImageSearchData {
+  engine: string;
+  minimumSimilarity: number;
+  results: ApiImageSearchResult[];
+}
+
 export interface ApiFolderFile {
   id: string;
   name: string;

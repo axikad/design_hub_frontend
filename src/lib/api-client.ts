@@ -3,6 +3,7 @@ import type {
   ApiEnvelope,
   ApiFolder,
   ApiHomeData,
+  ApiImageSearchData,
   BrowseFilters,
   PaginatedEnvelope,
 } from '../types/marketplace';
@@ -170,6 +171,17 @@ export const marketplaceApi = {
     apiGet<PaginatedEnvelope<ApiFolder[]>>('folders', query, signal),
   folder: (id: string, query: Query, signal?: AbortSignal) =>
     apiGet<PaginatedEnvelope<ApiFolder>>(`folders/${encodeURIComponent(id)}`, query, signal),
+  searchByImage: (image: File, signal?: AbortSignal) => {
+    const body = new FormData();
+    body.append('image', image);
+    body.append('limit', '20');
+    return apiRequest<ApiEnvelope<ApiImageSearchData>>('designs/search-by-image', {
+      method: 'POST',
+      body,
+      signal,
+      authenticated: true,
+    });
+  },
 };
 
 export const authApi = {

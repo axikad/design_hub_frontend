@@ -89,9 +89,6 @@ export default function App() {
         <div className="flex flex-col min-h-screen text-stone-900 bg-[#FAF8F5]">
           <a href="#main-content" className="sr-only z-[100] rounded-lg bg-stone-950 px-4 py-2 text-sm font-semibold text-white focus:not-sr-only focus:fixed focus:left-4 focus:top-4">Skip to main content</a>
           <Header />
-          <div className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-center text-[11px] font-medium text-amber-950">
-            Live marketplace catalog, secure Razorpay checkout and protected buyer downloads
-          </div>
           <main id="main-content" tabIndex={-1} className="flex-1 focus:outline-none">
             <Suspense fallback={<PageLoading />}>
             <Routes>
