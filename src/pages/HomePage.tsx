@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { AlertCircle, ArrowRight, Compass, Search, Store, UploadCloud } from 'lucide-react';
+import { AlertCircle, ArrowRight, Compass, Cpu, Search, Store, UploadCloud } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { CollectionCard } from '../components/common/CollectionCard';
 import { DesignCard } from '../components/common/DesignCard';
@@ -79,7 +79,43 @@ export const HomePage: React.FC = () => {
 
       {error && <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8"><div className="flex flex-col items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-5 text-sm text-red-900 sm:flex-row sm:items-center sm:justify-between"><span className="inline-flex items-center gap-2"><AlertCircle className="h-5 w-5" />{error}</span><button type="button" onClick={() => setReloadKey((value) => value + 1)} className="rounded-lg bg-red-900 px-4 py-2 text-xs font-semibold text-white">Try again</button></div></section>}
 
-      <section className="border-b border-stone-200 bg-white py-14"><div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8"><div className="flex items-end justify-between gap-4"><div><p className="text-xs font-bold uppercase tracking-[0.18em] text-amber-800">Machine catalog</p><h2 className="mt-2 font-serif text-3xl font-semibold text-stone-950">Browse by machine type</h2></div><Link to="/explore" className="hidden items-center gap-1 text-sm font-semibold text-stone-700 hover:text-amber-900 sm:flex">View all <ArrowRight className="h-4 w-4" /></Link></div>{loading ? <div className="mt-7 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{Array.from({ length: 6 }).map((_, index) => <div key={index} className="h-14 animate-pulse rounded-xl bg-stone-100" />)}</div> : <div className="mt-7 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{(filters?.machineTypes ?? []).slice(0, 6).map((machine) => <Link key={machine.id} to={`/explore?machineType=${encodeURIComponent(machine.id)}`} className="group flex items-center justify-between rounded-xl border border-stone-200 bg-[#FAF8F5] p-4 transition hover:border-amber-300 hover:bg-amber-50/50"><span className="font-semibold text-stone-800 group-hover:text-amber-950">{machine.name}</span><ArrowRight className="h-4 w-4 text-stone-400 group-hover:text-amber-800" /></Link>)}</div>}</div></section>
+      <section className="border-b border-stone-200 bg-white py-14">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="flex items-end justify-between gap-4">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.18em] text-amber-800">Machine catalog</p>
+              <h2 className="mt-2 font-serif text-3xl font-semibold text-stone-950">Browse by machine</h2>
+              <p className="mt-2 text-sm text-stone-500">Start with your machine, then narrow designs by machine type and production details.</p>
+            </div>
+            <Link to="/explore" className="hidden items-center gap-1 text-sm font-semibold text-stone-700 hover:text-amber-900 sm:flex">All machines <ArrowRight className="h-4 w-4" /></Link>
+          </div>
+          {loading ? (
+            <div className="mt-7 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+              {Array.from({ length: 6 }).map((_, index) => <div key={index} className="h-32 animate-pulse rounded-xl bg-stone-100" />)}
+            </div>
+          ) : (filters?.machines ?? []).length > 0 ? (
+            <div className="mt-7 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+              {(filters?.machines ?? []).map((machine) => (
+                <Link
+                  key={machine.id}
+                  to={`/explore?machine=${encodeURIComponent(machine.id)}`}
+                  className="group overflow-hidden rounded-xl border border-stone-200 bg-[#FAF8F5] transition hover:-translate-y-0.5 hover:border-amber-400 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-700 focus-visible:ring-offset-2"
+                >
+                  <div className="flex aspect-[16/9] items-center justify-center overflow-hidden bg-stone-100">
+                    {machine.imageUri ? <img src={machine.imageUri} alt="" loading="lazy" className="h-full w-full object-cover transition duration-300 group-hover:scale-105" /> : <Cpu className="h-7 w-7 text-stone-400" aria-hidden="true" />}
+                  </div>
+                  <div className="flex items-center justify-between gap-2 p-3">
+                    <span className="text-sm font-semibold leading-snug text-stone-800 group-hover:text-amber-950">{machine.name}</span>
+                    <ArrowRight className="h-4 w-4 shrink-0 text-stone-400 group-hover:text-amber-800" aria-hidden="true" />
+                  </div>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <div className="mt-7 rounded-2xl border border-dashed border-stone-300 bg-[#FAF8F5] p-8 text-center text-sm text-stone-500">No active machines are available yet.</div>
+          )}
+        </div>
+      </section>
 
       <section className="py-14 sm:py-18"><div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8"><div className="flex items-end justify-between gap-4"><div><p className="text-xs font-bold uppercase tracking-[0.18em] text-amber-800">Marketplace</p><h2 className="mt-2 font-serif text-3xl font-semibold text-stone-950">Latest designs</h2><p className="mt-2 text-sm text-stone-500">Recently published designs from the live catalog.</p></div><Link to="/explore" className="hidden items-center gap-1 text-sm font-semibold text-stone-700 hover:text-amber-900 sm:flex">Explore all <ArrowRight className="h-4 w-4" /></Link></div>{loading ? <div className="mt-8"><LoadingSkeleton count={8} /></div> : latestDesigns.length > 0 ? <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">{latestDesigns.map((design) => <DesignCard key={design.id} design={design} />)}</div> : <div className="mt-8 rounded-2xl border border-dashed border-stone-300 bg-white p-12 text-center text-sm text-stone-500">No published designs are available yet.</div>}</div></section>
 

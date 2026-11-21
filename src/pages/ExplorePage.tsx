@@ -37,6 +37,7 @@ export const ExplorePage: React.FC = () => {
   const [reloadKey, setReloadKey] = useState(0);
 
   const queryKey = searchParams.toString();
+  const selectedMachine = searchParams.get('machine') || '';
   const selectedMachineType = searchParams.get('machineType') || '';
   const selectedCategories = searchParams.getAll('category');
   const selectedDesignTypes = searchParams.getAll('designType');
@@ -68,6 +69,7 @@ export const ExplorePage: React.FC = () => {
       page: currentPage,
       per_page: 12,
       search: searchParams.get('q') || undefined,
+      machine_id: selectedMachine || undefined,
       machine_type_id: selectedMachineType || undefined,
       category_ids: selectedCategories,
       design_type_ids: selectedDesignTypes,
@@ -91,12 +93,19 @@ export const ExplorePage: React.FC = () => {
   }, [queryKey, reloadKey]);
 
   const cardDesigns = useMemo(() => designs.map((design) => toDesignCard(design, filters)), [designs, filters]);
+  const visibleMachineTypes = useMemo(() => {
+    if (!filters) return [];
+    return selectedMachine
+      ? filters.machineTypes.filter((machineType) => machineType.machineId === selectedMachine)
+      : filters.machineTypes;
+  }, [filters, selectedMachine]);
   const visibleCategories = useMemo(() => {
     if (!filters) return [];
-    return selectedMachineType
-      ? filters.categories.filter((category) => category.machineTypeIds.includes(selectedMachineType))
-      : filters.categories;
-  }, [filters, selectedMachineType]);
+    if (selectedMachineType) return filters.categories.filter((category) => category.machineTypeIds.includes(selectedMachineType));
+    if (!selectedMachine) return filters.categories;
+    const machineTypeIds = new Set(visibleMachineTypes.map((machineType) => machineType.id));
+    return filters.categories.filter((category) => category.machineTypeIds.some((id) => machineTypeIds.has(id)));
+  }, [filters, selectedMachine, selectedMachineType, visibleMachineTypes]);
   const visibleDesignTypes = useMemo(() => {
     if (!filters) return [];
     if (selectedCategories.length === 0) return filters.designTypes;
@@ -112,6 +121,11 @@ export const ExplorePage: React.FC = () => {
 
   const setSingle = (key: string, value: string) => updateParams((next) => {
     if (value) next.set(key, value); else next.delete(key);
+    if (key === 'machine') {
+      next.delete('machineType');
+      next.delete('category');
+      next.delete('designType');
+    }
     if (key === 'machineType') {
       next.delete('category');
       next.delete('designType');
@@ -136,12 +150,13 @@ export const ExplorePage: React.FC = () => {
     setSingle('q', localSearch.trim());
   };
 
-  const activeCount = [selectedMachineType, ...selectedCategories, ...selectedDesignTypes, ...selectedStitches, ...selectedNeedles, ...selectedAreas, searchParams.get('q') || ''].filter(Boolean).length;
+  const activeCount = [selectedMachine, selectedMachineType, ...selectedCategories, ...selectedDesignTypes, ...selectedStitches, ...selectedNeedles, ...selectedAreas, searchParams.get('q') || ''].filter(Boolean).length;
 
   const filterPanel = (
     <div className="space-y-6">
       <div className="flex items-center justify-between"><h2 className="font-serif text-lg font-semibold text-stone-950">Filter designs</h2>{activeCount > 0 && <button type="button" onClick={resetFilters} className="inline-flex items-center gap-1 text-xs font-semibold text-amber-900"><RotateCcw className="h-3.5 w-3.5" />Reset</button>}</div>
-      <label className="block text-xs font-semibold text-stone-700">Machine type<select value={selectedMachineType} onChange={(event) => setSingle('machineType', event.target.value)} className="mt-2 w-full rounded-xl border border-stone-300 bg-white px-3 py-2.5 text-sm"><option value="">All machine types</option>{filters?.machineTypes.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+      <label className="block text-xs font-semibold text-stone-700">Machine<select value={selectedMachine} onChange={(event) => setSingle('machine', event.target.value)} className="mt-2 w-full rounded-xl border border-stone-300 bg-white px-3 py-2.5 text-sm"><option value="">All machines</option>{(filters?.machines ?? []).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+      <label className="block text-xs font-semibold text-stone-700">Machine type<select value={selectedMachineType} onChange={(event) => setSingle('machineType', event.target.value)} className="mt-2 w-full rounded-xl border border-stone-300 bg-white px-3 py-2.5 text-sm"><option value="">All machine types</option>{visibleMachineTypes.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
       <FilterGroup title="Categories" loading={filterLoading} items={visibleCategories.map((item) => ({ id: item.id, name: item.name }))} selected={selectedCategories} onToggle={(value) => toggleMultiple('category', value)} />
       <FilterGroup title="Design types" loading={filterLoading} items={visibleDesignTypes.map((item) => ({ id: item.id, name: item.name }))} selected={selectedDesignTypes} onToggle={(value) => toggleMultiple('designType', value)} limit={18} />
       <FilterGroup title="Stitch count" items={stitchOptions.map((item) => ({ id: item.value, name: item.label }))} selected={selectedStitches} onToggle={(value) => toggleMultiple('stitch', value)} />

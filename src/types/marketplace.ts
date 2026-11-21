@@ -115,6 +115,13 @@ export interface BrowseMachineType {
   categoryIds: string[];
 }
 
+export interface BrowseMachine {
+  id: string;
+  name: string;
+  imageUri: string | null;
+  machineTypeIds: string[];
+}
+
 export interface BrowseCategory {
   id: string;
   name: string;
@@ -129,6 +136,7 @@ export interface BrowseDesignType {
 }
 
 export interface BrowseFilters {
+  machines: BrowseMachine[];
   machineTypes: BrowseMachineType[];
   categories: BrowseCategory[];
   designTypes: BrowseDesignType[];
