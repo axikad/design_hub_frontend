@@ -174,18 +174,19 @@ export const HomePage: React.FC = () => {
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <SectionHeading eyebrow="Machine catalog" title="Browse by machine" link="/explore" linkLabel="All machines" compact />
           {loading ? (
-            <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">{Array.from({ length: 6 }).map((_, index) => <div key={index} className="h-28 animate-pulse rounded-xl bg-stone-100" />)}</div>
+            <div className="mt-5 grid grid-cols-2 gap-3 sm:[grid-template-columns:repeat(auto-fit,minmax(180px,1fr))]">{Array.from({ length: 5 }).map((_, index) => <div key={index} className="h-24 animate-pulse rounded-xl bg-stone-100" />)}</div>
           ) : (filters?.machines ?? []).length > 0 ? (
-            <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-              {(filters?.machines ?? []).slice(0, 6).map((machine) => (
-                <Link key={machine.id} to={`/explore?machine=${encodeURIComponent(machine.id)}`} className="group overflow-hidden rounded-xl border border-stone-200/80 bg-stone-50/60 transition hover:-translate-y-0.5 hover:border-amber-600/60 hover:bg-amber-50/30 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-700 focus-visible:ring-offset-2">
-                  <div className="flex aspect-[16/8] items-center justify-center overflow-hidden bg-stone-100">
-                    {machine.imageUri ? <img src={machine.imageUri} alt="" loading="lazy" className="h-full w-full object-cover transition duration-300 group-hover:scale-105" /> : <Cpu className="h-6 w-6 text-stone-500" aria-hidden="true" />}
+            <div className="mt-5 grid grid-cols-2 gap-3 sm:[grid-template-columns:repeat(auto-fit,minmax(180px,1fr))]">
+              {(filters?.machines ?? []).map((machine) => (
+                <Link key={machine.id} to={`/explore?machine=${encodeURIComponent(machine.id)}`} className="group flex min-h-24 items-center gap-3 rounded-xl border border-stone-200/80 bg-stone-50/60 p-3 transition hover:-translate-y-0.5 hover:border-amber-600/60 hover:bg-amber-50/40 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-700 focus-visible:ring-offset-2 sm:p-4">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-stone-200/80 text-stone-600 transition group-hover:bg-amber-100 group-hover:text-amber-900">
+                    {machine.imageUri ? <img src={machine.imageUri} alt="" loading="lazy" className="h-full w-full object-cover transition duration-300 group-hover:scale-105" /> : <Cpu className="h-5 w-5" aria-hidden="true" />}
                   </div>
-                  <div className="p-3">
-                    <h3 className="text-sm font-semibold leading-snug text-stone-900 group-hover:text-amber-950">{machine.name}</h3>
-                    <p className="mt-1 text-[10px] text-stone-500">{machine.machineTypeIds.length} machine {machine.machineTypeIds.length === 1 ? 'type' : 'types'}</p>
+                  <div className="min-w-0 flex-1">
+                    <h3 className="line-clamp-2 text-sm font-semibold leading-snug text-stone-900 group-hover:text-amber-950">{machine.name}</h3>
+                    <p className="mt-1 text-[10px] text-stone-500">View matching designs</p>
                   </div>
+                  <ChevronRight className="hidden h-4 w-4 shrink-0 text-stone-400 transition group-hover:translate-x-0.5 group-hover:text-amber-800 xl:block" aria-hidden="true" />
                 </Link>
               ))}
             </div>
