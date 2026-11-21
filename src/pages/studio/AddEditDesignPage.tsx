@@ -1,766 +1,410 @@
-import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
-import {
-  UploadCloud,
-  CheckCircle2,
-  ArrowRight,
-  ArrowLeft,
-  Sparkles,
-  FileCode,
-  Image as ImageIcon,
-  Check,
-  AlertCircle,
-  Eye,
-  Trash2
-} from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { ArrowLeft, Image as ImageIcon, LoaderCircle, Plus, Save, Trash2, UploadCloud } from 'lucide-react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
-import {
-  CATEGORY_OPTIONS,
-  MACHINE_OPTIONS,
-  MACHINE_TYPE_OPTIONS,
-  DESIGN_TYPE_OPTIONS,
-  FILE_FORMAT_OPTIONS,
-  ASSET_IMAGES,
-} from '../../data/mockData';
+import { ApiError, getErrorMessage, studioApi } from '../../lib/api-client';
+import type { ApiDesign, ApiImage } from '../../types/marketplace';
+import type { DesignFormConfig, DesignOptionItem, DesignOptions, PricingPreview } from '../../types/studio';
+
+type VariantValue = string | number;
+interface VariantForm {
+  key: string;
+  typeId: string | null;
+  customTypeName: string;
+  typeName: string;
+  nameOrNumber: string;
+  stitchCount: VariantValue;
+  needle: VariantValue;
+  area: VariantValue;
+  height: VariantValue;
+  width: VariantValue;
+  imageFile: File | null;
+  existingImage: { name: string; uri: string; thumbnailUri?: string | null } | null;
+  removeImage: boolean;
+}
+
+const today = () => {
+  const value = new Date();
+  value.setMinutes(value.getMinutes() - value.getTimezoneOffset());
+  return value.toISOString().slice(0, 10);
+};
+const money = (paise: number) => `₹${(paise / 100).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
+const emptyVariant = (type: DesignOptionItem): VariantForm => ({
+  key: `type:${type.id}`,
+  typeId: type.id,
+  customTypeName: '',
+  typeName: type.name,
+  nameOrNumber: '',
+  stitchCount: '',
+  needle: '',
+  area: '',
+  height: '',
+  width: '',
+  imageFile: null,
+  existingImage: null,
+  removeImage: false,
+});
+const numericValue = (value: VariantValue) => value === '' ? undefined : Number(value);
 
 export const AddEditDesignPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { designs, user, addDesign, updateDesign, showToast } = useApp();
-
+  const { showToast } = useApp();
   const isEdit = Boolean(id);
-  const existingDesign = isEdit ? designs.find((d) => d.id === id) : null;
+  const [options, setOptions] = useState<DesignOptions | null>(null);
+  const [designTypes, setDesignTypes] = useState<DesignOptionItem[]>([]);
+  const [fileTypes, setFileTypes] = useState<DesignOptionItem[]>([]);
+  const [existingDesign, setExistingDesign] = useState<ApiDesign | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
 
-  // Form Steps (1 to 6)
-  const [currentStep, setCurrentStep] = useState(1);
-  const [publishedSuccess, setPublishedSuccess] = useState(false);
+  const [machineId, setMachineId] = useState('');
+  const [machineTypeId, setMachineTypeId] = useState('');
+  const [categoryId, setCategoryId] = useState('');
+  const [title, setTitle] = useState('');
+  const [variants, setVariants] = useState<VariantForm[]>([]);
+  const [customType, setCustomType] = useState('');
+  const [sequenceType, setSequenceType] = useState<VariantValue>('');
+  const [designFileTypeId, setDesignFileTypeId] = useState('');
+  const [priceRupees, setPriceRupees] = useState('100');
+  const [showPrice, setShowPrice] = useState(true);
+  const [publishDate, setPublishDate] = useState(today());
+  const [previewFiles, setPreviewFiles] = useState<File[]>([]);
+  const [stitchFiles, setStitchFiles] = useState<File[]>([]);
+  const [existingImages, setExistingImages] = useState<ApiImage[]>([]);
+  const [existingFiles, setExistingFiles] = useState<ApiDesign['files']>([]);
+  const [pricing, setPricing] = useState<PricingPreview | null>(null);
 
-  // Step 1: Basic Information
-  const [title, setTitle] = useState(existingDesign?.title || '');
-  const [description, setDescription] = useState(existingDesign?.description || '');
+  const machine = useMemo(() => options?.machines.find((item) => item.id === machineId) ?? null, [machineId, options]);
+  const config: DesignFormConfig | null = machine?.designFormConfig ?? null;
+  const machineTypes = useMemo(() => options?.machineTypes.filter((item) => machine?.machineTypeIds.includes(item.id)) ?? [], [machine, options]);
+  const categories = useMemo(() => {
+    const all = options?.categories ?? [];
+    if (machineTypeId) return all.filter((item) => item.machineTypeIds?.includes(machineTypeId));
+    return all.filter((item) => machine?.categoryIds.includes(item.id));
+  }, [machine, machineTypeId, options]);
 
-  // Step 2: Classification
-  const [machine, setMachine] = useState<any>(existingDesign?.machine || MACHINE_OPTIONS[0]);
-  const [machineType, setMachineType] = useState<any>(existingDesign?.machineType || MACHINE_TYPE_OPTIONS[0]);
-  const [category, setCategory] = useState<any>(existingDesign?.category || CATEGORY_OPTIONS[0]);
-  const [designTypes, setDesignTypes] = useState<string[]>(existingDesign?.designTypes || ['Zari Work']);
-  const [customTypeInput, setCustomTypeInput] = useState('');
+  useEffect(() => {
+    const controller = new AbortController();
+    const load = async () => {
+      setLoading(true);
+      try {
+        const [optionResponse, designResponse] = await Promise.all([
+          studioApi.designOptions(controller.signal),
+          id ? studioApi.design(id, controller.signal) : Promise.resolve(null),
+        ]);
+        if (controller.signal.aborted) return;
+        setOptions(optionResponse.data);
+        const design = designResponse?.data ?? null;
+        setExistingDesign(design);
+        const initialMachine = design?.machineId || optionResponse.data.machines[0]?.id || '';
+        setMachineId(initialMachine);
+        setMachineTypeId(design?.machineTypeId || '');
+        setCategoryId(design?.categoryId || '');
+        setTitle(design?.title || '');
+        setSequenceType(design?.sequenceType || '');
+        setDesignFileTypeId(design?.designFileTypeId || '');
+        setPriceRupees(String((design?.pricePaise ?? 10000) / 100));
+        setShowPrice(design?.showPrice ?? true);
+        setPublishDate(design?.publishDate || today());
+        setExistingImages(design?.images ?? []);
+        setExistingFiles(design?.files ?? []);
+        setVariants((design?.designTypes ?? []).map((item, index) => ({
+          key: item.typeId ? `type:${item.typeId}` : `custom:${item.customTypeName || index}`,
+          typeId: item.typeId,
+          customTypeName: item.customTypeName || '',
+          typeName: item.typeName || item.customTypeName || 'Custom type',
+          nameOrNumber: item.details.nameOrNumber || '',
+          stitchCount: item.details.stitchCount ?? '',
+          needle: item.details.needle ?? '',
+          area: item.details.area ?? '',
+          height: item.details.height ?? '',
+          width: item.details.width ?? '',
+          imageFile: null,
+          existingImage: item.details.image,
+          removeImage: false,
+        })));
+      } catch (error) {
+        if (error instanceof DOMException && error.name === 'AbortError') return;
+        showToast('Could not open design form', getErrorMessage(error), 'error');
+      } finally {
+        if (!controller.signal.aborted) setLoading(false);
+      }
+    };
+    void load();
+    return () => controller.abort();
+  }, [id, showToast]);
 
-  // Step 3: Specifications
-  const [designNumber, setDesignNumber] = useState('TXH-' + Math.floor(1000 + Math.random() * 9000));
-  const [stitches, setStitches] = useState<number>(existingDesign?.stitches || 45000);
-  const [needles, setNeedles] = useState<number>(existingDesign?.needles || 6);
-  const [heightMm, setHeightMm] = useState<number>(existingDesign?.heightMm || 120);
-  const [widthMm, setWidthMm] = useState<number>(existingDesign?.widthMm || 350);
-  const [sequenceType, setSequenceType] = useState<any>(existingDesign?.sequenceType || 'Standard 3mm Single');
-
-  // Step 4: Pricing
-  const [price, setPrice] = useState<number>(existingDesign?.price || 1499);
-
-  // Step 5: Files
-  const [images, setImages] = useState<string[]>(
-    existingDesign?.images || [ASSET_IMAGES.sareeBorder, ASSET_IMAGES.hero]
-  );
-  const [selectedFormats, setSelectedFormats] = useState<string[]>(
-    existingDesign?.formats || ['EMB', 'DST', 'PES']
-  );
-  const [uploadProgress, setUploadProgress] = useState(100);
-  const [isSimulatingUpload, setIsSimulatingUpload] = useState(false);
-
-  // Auto calculate area
-  const areaCm2 = Math.round((heightMm * widthMm) / 100);
-
-  const toggleDesignType = (type: string) => {
-    setDesignTypes((prev) =>
-      prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]
-    );
-  };
-
-  const handleAddCustomType = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (customTypeInput.trim() && !designTypes.includes(customTypeInput.trim())) {
-      setDesignTypes((prev) => [...prev, customTypeInput.trim()]);
-      setCustomTypeInput('');
-    }
-  };
-
-  const toggleFormat = (fmt: string) => {
-    setSelectedFormats((prev) =>
-      prev.includes(fmt) ? prev.filter((f) => f !== fmt) : [...prev, fmt]
-    );
-  };
-
-  const handleSimulateFileUpload = () => {
-    setIsSimulatingUpload(true);
-    setUploadProgress(20);
-    setTimeout(() => setUploadProgress(65), 300);
-    setTimeout(() => {
-      setUploadProgress(100);
-      setIsSimulatingUpload(false);
-      showToast('Files selected', 'The selected files are ready for the API upload step.', 'success');
-    }, 700);
-  };
-
-  const handlePublish = (status: 'active' | 'draft') => {
-    if (!title.trim()) {
-      showToast('Title Required', 'Please enter a design title.', 'error');
-      setCurrentStep(1);
+  useEffect(() => {
+    if (!categoryId) {
+      setDesignTypes([]);
       return;
     }
+    const controller = new AbortController();
+    studioApi.categoryTypes(categoryId, controller.signal)
+      .then((response) => setDesignTypes(response.data))
+      .catch((error) => {
+        if (!(error instanceof DOMException && error.name === 'AbortError')) {
+          showToast('Could not load design types', getErrorMessage(error), 'error');
+        }
+      });
+    return () => controller.abort();
+  }, [categoryId, showToast]);
 
-    const payload = {
-      title,
-      description,
-      category,
-      machine,
-      machineType,
-      designTypes,
-      formats: selectedFormats as any,
-      price,
-      status,
-      stitches,
-      needles,
-      heightMm,
-      widthMm,
-      areaCm2,
-      sequenceType,
-      images,
-      files: [
-        { name: `${title.replace(/\s+/g, '_')}.EMB`, format: 'EMB', size: '4.6 MB' },
-        { name: `${title.replace(/\s+/g, '_')}.DST`, format: 'DST', size: '2.1 MB' },
-        { name: `${title.replace(/\s+/g, '_')}.PES`, format: 'PES', size: '2.4 MB' },
-      ],
-      buyerProtection: 'File details and access terms will be supplied by the server.',
+  useEffect(() => {
+    if (!machineId) {
+      setFileTypes([]);
+      return;
+    }
+    const controller = new AbortController();
+    studioApi.machineFileTypes(machineId, controller.signal)
+      .then((response) => setFileTypes(response.data))
+      .catch((error) => {
+        if (!(error instanceof DOMException && error.name === 'AbortError')) {
+          showToast('Could not load file types', getErrorMessage(error), 'error');
+        }
+      });
+    return () => controller.abort();
+  }, [machineId, showToast]);
+
+  useEffect(() => {
+    if (!config?.pricing || Number(priceRupees) < 0) {
+      setPricing(null);
+      return;
+    }
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => {
+      studioApi.pricingPreview(Math.round(Number(priceRupees || 0) * 100), controller.signal)
+        .then((response) => setPricing(response.data))
+        .catch(() => setPricing(null));
+    }, 300);
+    return () => {
+      window.clearTimeout(timeout);
+      controller.abort();
     };
+  }, [config?.pricing, priceRupees]);
 
-    if (isEdit && existingDesign) {
-      updateDesign(existingDesign.id, payload);
+  const selectMachine = (value: string) => {
+    setMachineId(value);
+    setMachineTypeId('');
+    setCategoryId('');
+    setVariants([]);
+    setDesignFileTypeId('');
+    setFieldErrors({});
+  };
+  const selectMachineType = (value: string) => {
+    setMachineTypeId(value);
+    setCategoryId('');
+    setVariants([]);
+  };
+  const selectCategory = (value: string) => {
+    setCategoryId(value);
+    setVariants([]);
+  };
+  const toggleType = (type: DesignOptionItem) => {
+    setVariants((current) => current.some((item) => item.typeId === type.id)
+      ? current.filter((item) => item.typeId !== type.id)
+      : [...current, emptyVariant(type)]);
+  };
+  const addCustomType = () => {
+    const value = customType.trim();
+    if (!value) return;
+    const key = `custom:${value.toLowerCase()}`;
+    if (variants.some((item) => item.key === key)) return;
+    setVariants((current) => [...current, { ...emptyVariant({ id: key, name: value }), key, typeId: null, customTypeName: value }]);
+    setCustomType('');
+  };
+  const updateVariant = (index: number, patch: Partial<VariantForm>) => {
+    setVariants((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, ...patch } : item));
+  };
+  const firstError = (prefix: string) => Object.entries(fieldErrors).find(([key]) => key === prefix || key.startsWith(`${prefix}.`))?.[1]?.[0];
+
+  const uploadFiles = async (files: File[]) => Promise.all(files.map(async (file) => {
+    const response = await studioApi.upload(file);
+    return { name: file.name, uri: response.data.url };
+  }));
+
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!config || submitting) return;
+    setSubmitting(true);
+    setFieldErrors({});
+    try {
+      const images = previewFiles.length > 0
+        ? await uploadFiles(previewFiles)
+        : existingImages.map((image) => ({ name: image.name, uri: image.sourceUri || image.uri }));
+      const files = stitchFiles.length > 0
+        ? await uploadFiles(stitchFiles)
+        : existingFiles.filter((file) => file.uri).map((file) => ({ name: file.name, uri: file.uri as string }));
+      const designTypePayload = await Promise.all(variants.map(async (variant) => {
+        const details: Record<string, unknown> = {};
+        const fields = config.specificationFields;
+        if (fields.nameOrNumber && variant.nameOrNumber !== '') details.nameOrNumber = variant.nameOrNumber;
+        if (fields.stitchCount && variant.stitchCount !== '') details.stitchCount = numericValue(variant.stitchCount);
+        if (fields.needle && variant.needle !== '') details.needle = numericValue(variant.needle);
+        if (fields.area && variant.area !== '') details.area = numericValue(variant.area);
+        if (fields.height && variant.height !== '') details.height = numericValue(variant.height);
+        if (fields.width && variant.width !== '') details.width = numericValue(variant.width);
+        if (fields.image && variant.imageFile) {
+          const [uploaded] = await uploadFiles([variant.imageFile]);
+          details.image = uploaded;
+        } else if (fields.image && variant.removeImage) {
+          details.removeImage = true;
+        }
+        return {
+          ...(variant.typeId ? { typeId: variant.typeId } : { customTypeName: variant.customTypeName }),
+          ...(config.designSpecifications ? { details } : {}),
+        };
+      }));
+
+      const payload: Record<string, unknown> = { machineId };
+      if (config.machineType) payload.machineTypeId = machineTypeId || null;
+      if (config.category) payload.categoryId = categoryId || null;
+      if (config.title) payload.title = title.trim();
+      if (config.designTypes) payload.designTypes = designTypePayload;
+      if (config.sequenceType && sequenceType !== '') payload.sequenceType = Number(sequenceType);
+      if (config.designFileType) payload.designFileTypeId = designFileTypeId || null;
+      if (config.previewImages) payload.images = images;
+      if (config.stitchFiles) payload.files = files;
+      if (config.pricing) {
+        payload.pricePaise = Math.round(Number(priceRupees || 0) * 100);
+        payload.showPrice = showPrice;
+      }
+      payload.publishDate = publishDate || null;
+
+      const response = id
+        ? await studioApi.updateDesign(id, payload)
+        : await studioApi.createDesign(payload);
+      showToast(id ? 'Design updated' : 'Design published', `“${response.data.title}” is saved in your studio.`, 'success');
       navigate('/studio/designs');
-    } else {
-      addDesign(payload);
-      setPublishedSuccess(true);
+    } catch (error) {
+      if (error instanceof ApiError) {
+        setFieldErrors(error.errors ?? {});
+        const detail = error.errors ? Object.values(error.errors).flat()[0] : error.message;
+        showToast('Design could not be saved', detail || error.message, 'error');
+      } else {
+        showToast('Design could not be saved', getErrorMessage(error), 'error');
+      }
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  if (publishedSuccess) {
-    return (
-      <div className="min-h-screen bg-[#FAF8F5] py-20 px-4">
-        <div className="max-w-md mx-auto bg-white rounded-2xl border border-stone-200/90 p-8 shadow-md text-center space-y-6">
-          <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center mx-auto">
-            <CheckCircle2 className="w-10 h-10" />
-          </div>
-
-          <div className="space-y-1">
-            <span className="text-xs font-semibold uppercase tracking-wider text-emerald-800">
-              Live in Marketplace
-            </span>
-            <h1 className="font-serif text-2xl font-bold text-stone-900">
-              Design Published Successfully
-            </h1>
-            <p className="text-xs text-stone-500">
-              "{title}" is now available to garment manufacturers, boutique designers, and export houses.
-            </p>
-          </div>
-
-          <div className="p-4 bg-stone-50 rounded-xl border border-stone-200 text-left flex items-center gap-4">
-            <img src={images[0]} alt={title} className="w-14 h-14 rounded-lg object-cover" />
-            <div>
-              <h4 className="font-serif text-xs font-bold text-stone-900">{title}</h4>
-              <p className="text-[11px] text-stone-500">{category} · {machine}</p>
-              <p className="text-xs font-mono font-bold text-stone-900 mt-1">₹{price.toLocaleString('en-IN')}</p>
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-2 pt-2">
-            <Link
-              to="/studio/designs"
-              className="py-3 px-4 bg-stone-900 hover:bg-stone-800 text-white font-semibold rounded-xl text-xs"
-            >
-              Back to My Designs Inventory
-            </Link>
-            <Link
-              to="/explore"
-              className="py-2.5 text-xs font-semibold text-stone-600 hover:text-stone-900"
-            >
-              View in Public Marketplace
-            </Link>
-          </div>
-        </div>
-      </div>
-    );
+  if (loading || !options || !config) {
+    return <div className="flex min-h-[70vh] items-center justify-center bg-[#FAF8F5] text-stone-500"><LoaderCircle className="mr-2 h-5 w-5 animate-spin" /> Loading design form…</div>;
   }
 
-  const stepsList = [
-    { number: 1, label: 'Basic Info' },
-    { number: 2, label: 'Classification' },
-    { number: 3, label: 'Specifications' },
-    { number: 4, label: 'Pricing' },
-    { number: 5, label: 'Files & Previews' },
-    { number: 6, label: 'Review & Publish' },
-  ];
-
   return (
-    <div className="min-h-screen bg-[#FAF8F5] pb-24">
-      {/* Header */}
-      <div className="bg-white border-b border-stone-200 py-6">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Link
-              to="/studio/designs"
-              className="p-1.5 text-stone-500 hover:text-stone-900 hover:bg-stone-100 rounded-lg"
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </Link>
-            <div>
-              <h1 className="font-serif text-xl font-bold text-stone-900">
-                {isEdit ? 'Edit Design Listing' : 'Upload Production Embroidery Design'}
-              </h1>
-              <p className="text-xs text-stone-500">
-                Creator: <span className="font-semibold text-stone-800">{user.name}</span> ({user.location})
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => handlePublish('draft')}
-              className="px-3.5 py-2 text-xs font-semibold text-stone-700 bg-stone-100 hover:bg-stone-200 rounded-lg"
-            >
-              Save Draft
-            </button>
-          </div>
+    <main className="min-h-screen bg-[#FAF8F5] pb-24">
+      <header className="border-b border-stone-200 bg-white py-6">
+        <div className="mx-auto flex max-w-5xl items-center justify-between px-4 sm:px-6">
+          <div className="flex items-center gap-3"><Link to="/studio/designs" className="rounded-lg p-2 text-stone-500 hover:bg-stone-100"><ArrowLeft className="h-5 w-5" /></Link><div><p className="text-xs font-bold uppercase tracking-wider text-amber-800">Creator studio</p><h1 className="font-serif text-2xl font-semibold text-stone-950">{isEdit ? 'Edit design' : 'Add design'}</h1></div></div>
+          {existingDesign && <Link to={`/design/${existingDesign.id}`} className="text-sm font-semibold text-amber-900 hover:underline">Public preview</Link>}
         </div>
-      </div>
+      </header>
 
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-8">
-        
-        {/* Step Progress Tracker */}
-        <div className="bg-white p-4 rounded-xl border border-stone-200/90">
-          <div className="grid grid-cols-6 gap-2 text-center text-xs">
-            {stepsList.map((step) => {
-              const isCurrent = currentStep === step.number;
-              const isCompleted = currentStep > step.number;
-              return (
-                <button
-                  key={step.number}
-                  type="button"
-                  onClick={() => setCurrentStep(step.number)}
-                  className={`py-2 px-1 rounded-lg transition-colors flex flex-col items-center gap-1 ${
-                    isCurrent
-                      ? 'bg-stone-900 text-white font-bold'
-                      : isCompleted
-                      ? 'text-amber-900 bg-amber-50 font-semibold'
-                      : 'text-stone-400 hover:text-stone-700'
-                  }`}
-                >
-                  <span className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-mono border">
-                    {isCompleted ? '✓' : step.number}
-                  </span>
-                  <span className="hidden sm:inline text-[11px] truncate max-w-full">
-                    {step.label}
-                  </span>
-                </button>
-              );
-            })}
+      <form onSubmit={(event) => void submit(event)} className="mx-auto max-w-5xl space-y-6 px-4 pt-8 sm:px-6">
+        <section className="rounded-2xl border border-stone-200 bg-white p-6">
+          <h2 className="font-serif text-xl font-semibold text-stone-950">Machine and classification</h2>
+          <div className="mt-5 grid gap-4 sm:grid-cols-2">
+            <label className="text-sm font-semibold text-stone-700">Machine<select required value={machineId} onChange={(event) => selectMachine(event.target.value)} className="mt-2 w-full rounded-xl border border-stone-300 bg-white px-3 py-3 font-normal outline-none focus:border-amber-700">{options.machines.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select><FieldError message={firstError('machineId')} /></label>
+            {config.machineType && <label className="text-sm font-semibold text-stone-700">Machine type<select required={config.required.machineType} value={machineTypeId} onChange={(event) => selectMachineType(event.target.value)} className="mt-2 w-full rounded-xl border border-stone-300 bg-white px-3 py-3 font-normal outline-none focus:border-amber-700"><option value="">Select machine type</option>{machineTypes.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select><FieldError message={firstError('machineTypeId')} /></label>}
+            {config.category && <label className="text-sm font-semibold text-stone-700">Category<select required={config.required.category} value={categoryId} onChange={(event) => selectCategory(event.target.value)} className="mt-2 w-full rounded-xl border border-stone-300 bg-white px-3 py-3 font-normal outline-none focus:border-amber-700"><option value="">Select category</option>{categories.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select><FieldError message={firstError('categoryId')} /></label>}
+            {config.title && <label className="text-sm font-semibold text-stone-700">Title<input required={config.required.title} value={title} onChange={(event) => setTitle(event.target.value)} maxLength={120} className="mt-2 w-full rounded-xl border border-stone-300 px-3 py-3 font-normal outline-none focus:border-amber-700" /><FieldError message={firstError('title')} /></label>}
           </div>
-        </div>
+        </section>
 
-        {/* Step Container Form */}
-        <div className="bg-white rounded-2xl border border-stone-200/90 p-8 shadow-xs">
-          
-          {/* STEP 1: Basic Information */}
-          {currentStep === 1 && (
-            <div className="space-y-6">
-              <div>
-                <h3 className="font-serif text-lg font-bold text-stone-900">
-                  Step 1: Basic Information
-                </h3>
-                <p className="text-xs text-stone-500">
-                  Provide an authentic title and notes for garment manufacturers.
-                </p>
-              </div>
+        {config.designTypes && (
+          <section className="rounded-2xl border border-stone-200 bg-white p-6">
+            <h2 className="font-serif text-xl font-semibold text-stone-950">Design types</h2>
+            <p className="mt-1 text-sm text-stone-500">Select every type included in this design. Each type keeps its own specifications.</p>
+            <div className="mt-4 flex flex-wrap gap-2">{designTypes.map((type) => <button key={type.id} type="button" onClick={() => toggleType(type)} className={`rounded-full border px-4 py-2 text-sm font-semibold ${variants.some((item) => item.typeId === type.id) ? 'border-stone-950 bg-stone-950 text-white' : 'border-stone-300 bg-white text-stone-700 hover:border-amber-700'}`}>{type.name}</button>)}</div>
+            <div className="mt-4 flex max-w-lg gap-2"><input value={customType} onChange={(event) => setCustomType(event.target.value)} placeholder="Optional custom type" className="min-w-0 flex-1 rounded-xl border border-stone-300 px-3 py-2.5 text-sm outline-none focus:border-amber-700" /><button type="button" onClick={addCustomType} className="inline-flex items-center rounded-xl border border-stone-300 px-4 text-sm font-semibold"><Plus className="mr-1 h-4 w-4" />Add</button></div>
+            <FieldError message={firstError('designTypes')} />
 
-              <div className="p-3 bg-stone-50 rounded-xl border border-stone-200 flex items-center gap-3 text-xs">
-                <img src={user.avatar} alt={user.name} className="w-8 h-8 rounded-full object-cover" />
-                <div>
-                  <span className="text-stone-500 text-[11px]">Signing Digitizer</span>
-                  <p className="font-semibold text-stone-900">{user.name} · {user.location}</p>
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-stone-700 block">
-                  Design Title *
-                </label>
-                <input
-                  type="text"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder="e.g. Royal Zari Saree Border with Lotus Medallion"
-                  className="w-full text-xs bg-stone-50 border border-stone-300 rounded-xl p-3 text-stone-900 focus:outline-none focus:ring-1 focus:ring-amber-700 focus:bg-white"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-stone-700 block">
-                  Technical Description & Fabric Suitability *
-                </label>
-                <textarea
-                  rows={4}
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Describe thread formulas, recommended stabilizer, density adjustments, and fabric types..."
-                  className="w-full text-xs bg-stone-50 border border-stone-300 rounded-xl p-3 text-stone-900 focus:outline-none focus:ring-1 focus:ring-amber-700 focus:bg-white"
-                />
-              </div>
+            <div className="mt-6 space-y-4">
+              {variants.map((variant, index) => <VariantCard key={variant.key} index={index} value={variant} config={config} error={firstError(`designTypes.${index}`)} onChange={(patch) => updateVariant(index, patch)} onRemove={() => setVariants((current) => current.filter((_, itemIndex) => itemIndex !== index))} />)}
             </div>
-          )}
+          </section>
+        )}
 
-          {/* STEP 2: Classification */}
-          {currentStep === 2 && (
-            <div className="space-y-6">
-              <div>
-                <h3 className="font-serif text-lg font-bold text-stone-900">
-                  Step 2: Machinery & Classification
-                </h3>
-                <p className="text-xs text-stone-500">
-                  Select matching machines and embroidery techniques.
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-                <div className="space-y-1.5">
-                  <label className="font-semibold text-stone-700 block">Category</label>
-                  <select
-                    value={category}
-                    onChange={(e) => setCategory(e.target.value as any)}
-                    className="w-full p-2.5 bg-stone-50 border border-stone-300 rounded-xl text-stone-900"
-                  >
-                    {CATEGORY_OPTIONS.map((c) => (
-                      <option key={c} value={c}>{c}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="font-semibold text-stone-700 block">Embroidery Machine</label>
-                  <select
-                    value={machine}
-                    onChange={(e) => setMachine(e.target.value as any)}
-                    className="w-full p-2.5 bg-stone-50 border border-stone-300 rounded-xl text-stone-900"
-                  >
-                    {MACHINE_OPTIONS.map((m) => (
-                      <option key={m} value={m}>{m}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="space-y-1.5 sm:col-span-2">
-                  <label className="font-semibold text-stone-700 block">Machine Calibration Type</label>
-                  <select
-                    value={machineType}
-                    onChange={(e) => setMachineType(e.target.value as any)}
-                    className="w-full p-2.5 bg-stone-50 border border-stone-300 rounded-xl text-stone-900"
-                  >
-                    {MACHINE_TYPE_OPTIONS.map((mt) => (
-                      <option key={mt} value={mt}>{mt}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* Design Types Multi-select & Custom Type */}
-              <div className="space-y-3 pt-2">
-                <label className="text-xs font-semibold text-stone-700 block">
-                  Select Techniques (Multiple Allowed):
-                </label>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                  {DESIGN_TYPE_OPTIONS.map((type) => {
-                    const active = designTypes.includes(type);
-                    return (
-                      <button
-                        key={type}
-                        type="button"
-                        onClick={() => toggleDesignType(type)}
-                        className={`p-2.5 rounded-lg border text-xs text-left transition-colors flex items-center justify-between ${
-                          active
-                            ? 'bg-amber-50 border-amber-300 text-amber-950 font-semibold'
-                            : 'bg-stone-50 border-stone-200 text-stone-600'
-                        }`}
-                      >
-                        <span className="truncate">{type}</span>
-                        {active && <Check className="w-3 h-3 text-amber-800 shrink-0" />}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {/* Custom Type Input */}
-                <div className="pt-2 flex gap-2 max-w-sm">
-                  <input
-                    type="text"
-                    value={customTypeInput}
-                    onChange={(e) => setCustomTypeInput(e.target.value)}
-                    placeholder="Add custom technique (e.g. 5mm Panni)"
-                    className="flex-1 text-xs bg-stone-50 border border-stone-300 rounded-lg px-3 py-2 text-stone-900"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleAddCustomType}
-                    className="px-3 py-2 bg-stone-100 hover:bg-stone-200 text-stone-800 text-xs font-semibold rounded-lg"
-                  >
-                    Add
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* STEP 3: Specifications */}
-          {currentStep === 3 && (
-            <div className="space-y-6">
-              <div>
-                <h3 className="font-serif text-lg font-bold text-stone-900">
-                  Step 3: Needle & Stitch Specifications
-                </h3>
-                <p className="text-xs text-stone-500">
-                  Accurate dimensions allow factories to calibrate hooping frames.
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-xs">
-                <div className="space-y-1.5">
-                  <label className="font-semibold text-stone-700 block">Design Code / Number</label>
-                  <input
-                    type="text"
-                    value={designNumber}
-                    onChange={(e) => setDesignNumber(e.target.value)}
-                    className="w-full p-2.5 bg-stone-50 border border-stone-300 rounded-xl font-mono text-stone-900"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="font-semibold text-stone-700 block">Total Stitch Count</label>
-                  <input
-                    type="number"
-                    value={stitches}
-                    onChange={(e) => setStitches(Number(e.target.value))}
-                    className="w-full p-2.5 bg-stone-50 border border-stone-300 rounded-xl font-mono text-stone-900"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="font-semibold text-stone-700 block">Active Needle Count</label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="15"
-                    value={needles}
-                    onChange={(e) => setNeedles(Number(e.target.value))}
-                    className="w-full p-2.5 bg-stone-50 border border-stone-300 rounded-xl font-mono text-stone-900"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="font-semibold text-stone-700 block">Height (mm)</label>
-                  <input
-                    type="number"
-                    value={heightMm}
-                    onChange={(e) => setHeightMm(Number(e.target.value))}
-                    className="w-full p-2.5 bg-stone-50 border border-stone-300 rounded-xl font-mono text-stone-900"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="font-semibold text-stone-700 block">Width (mm)</label>
-                  <input
-                    type="number"
-                    value={widthMm}
-                    onChange={(e) => setWidthMm(Number(e.target.value))}
-                    className="w-full p-2.5 bg-stone-50 border border-stone-300 rounded-xl font-mono text-stone-900"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="font-semibold text-stone-700 block">Calculated Area</label>
-                  <input
-                    type="text"
-                    disabled
-                    value={`${areaCm2} cm²`}
-                    className="w-full p-2.5 bg-stone-100 border border-stone-300 rounded-xl font-mono text-stone-600 font-bold"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-1.5 pt-2">
-                <label className="text-xs font-semibold text-stone-700 block">Sequence Mode</label>
-                <select
-                  value={sequenceType}
-                  onChange={(e) => setSequenceType(e.target.value as any)}
-                  className="w-full sm:w-1/2 p-2.5 bg-stone-50 border border-stone-300 rounded-xl text-xs text-stone-900"
-                >
-                  <option value="None">None (Standard Thread)</option>
-                  <option value="Standard 3mm Single">Standard 3mm Single</option>
-                  <option value="Double Sequence (3mm + 5mm)">Double Sequence (3mm + 5mm)</option>
-                  <option value="Reversible Sequin">Reversible Sequin</option>
-                </select>
-              </div>
-            </div>
-          )}
-
-          {/* STEP 4: Pricing & Commission Calculator */}
-          {currentStep === 4 && (
-            <div className="space-y-6">
-              <div>
-                <h3 className="font-serif text-lg font-bold text-stone-900">
-                  Step 4: Pricing & Royalties
-                </h3>
-                <p className="text-xs text-stone-500">
-                  Set the listing price in Indian Rupees. The server pricing preview will provide the current commission and estimated earning.
-                </p>
-              </div>
-
-              <div className="p-4 bg-amber-50 rounded-xl border border-amber-200/80 flex items-center justify-between text-xs text-amber-900">
-                <div className="flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-amber-700" />
-                  <span>
-                    <strong>Test Mode Environment:</strong> All pricing calculations are estimates. You can adjust prices anytime.
-                  </span>
-                </div>
-                <span className="font-mono uppercase font-bold text-[10px] bg-amber-200/80 px-2 py-0.5 rounded">
-                  Test Sandbox
-                </span>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-xs font-semibold text-stone-700 block">
-                  Buyer Selling Price (₹ INR) *
-                </label>
-                <div className="relative max-w-xs">
-                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 font-mono font-bold text-stone-500">
-                    ₹
-                  </span>
-                  <input
-                    type="number"
-                    min="100"
-                    step="50"
-                    value={price}
-                    onChange={(e) => setPrice(Number(e.target.value))}
-                    className="w-full pl-8 pr-4 py-3 bg-stone-50 border border-stone-300 rounded-xl text-stone-900 font-mono font-bold text-lg focus:outline-none focus:ring-1 focus:ring-amber-700"
-                  />
-                </div>
-              </div>
-
-              <div className="p-5 bg-stone-50 rounded-xl border border-stone-200 text-xs">
-                <h4 className="font-semibold text-stone-800">Seller pricing preview</h4>
-                <div className="mt-3 flex justify-between text-stone-600">
-                  <span>Listing price</span>
-                  <span className="font-mono tabular-nums">₹{price.toLocaleString('en-IN')}</span>
-                </div>
-                <p className="mt-3 border-t border-stone-200 pt-3 text-[11px] leading-5 text-stone-500">
-                  Commission and estimated seller earnings will be supplied by the seller pricing service. The browser must not calculate them.
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* STEP 5: Files & Images */}
-          {currentStep === 5 && (
-            <div className="space-y-6">
-              <div>
-                <h3 className="font-serif text-lg font-bold text-stone-900">
-                  Step 5: Stitch Files & Preview Photography
-                </h3>
-                <p className="text-xs text-stone-500">
-                  Upload high-res stitch samples and original machine file archives.
-                </p>
-              </div>
-
-              {/* Image Previews */}
-              <div className="space-y-3">
-                <label className="text-xs font-semibold text-stone-700 block">
-                  Product Preview Images ({images.length} Loaded)
-                </label>
-                <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
-                  {images.map((img, i) => (
-                    <div key={i} className="relative aspect-[4/3] rounded-xl overflow-hidden border border-stone-200 group">
-                      <img src={img} alt={`Preview ${i + 1}`} className="w-full h-full object-cover" />
-                      <button
-                        type="button"
-                        onClick={() => setImages(images.filter((_, idx) => idx !== i))}
-                        className="absolute top-1 right-1 p-1 bg-stone-900/80 hover:bg-stone-900 text-white rounded-md text-[10px]"
-                        title="Remove photo"
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </button>
-                    </div>
-                  ))}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setImages([...images, ASSET_IMAGES.navySequin]);
-                      showToast('Photo Added', 'Attached supplementary embroidery swatch.', 'info');
-                    }}
-                    className="border-2 border-dashed border-stone-300 hover:border-amber-700 rounded-xl flex flex-col items-center justify-center p-4 text-stone-500 text-xs gap-1 transition-colors"
-                  >
-                    <ImageIcon className="w-5 h-5 text-stone-400" />
-                    <span>Add Photo</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Format selection */}
-              <div className="space-y-2 pt-2">
-                <label className="text-xs font-semibold text-stone-700 block">
-                  Included Machine Formats:
-                </label>
-                <div className="flex flex-wrap gap-2 text-xs">
-                  {FILE_FORMAT_OPTIONS.map((fmt) => {
-                    const active = selectedFormats.includes(fmt);
-                    return (
-                      <button
-                        key={fmt}
-                        type="button"
-                        onClick={() => toggleFormat(fmt)}
-                        className={`px-3 py-1.5 rounded-lg font-mono font-medium border transition-colors ${
-                          active
-                            ? 'bg-stone-900 text-white border-stone-900'
-                            : 'bg-stone-50 text-stone-600 border-stone-200'
-                        }`}
-                      >
-                        {fmt}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Stitch File Upload Box with Validation Simulation */}
-              <div className="border-2 border-dashed border-stone-300 rounded-xl p-6 text-center bg-stone-50/50 space-y-3">
-                <div className="w-10 h-10 rounded-full bg-stone-200 flex items-center justify-center mx-auto text-stone-600">
-                  <FileCode className="w-5 h-5" />
-                </div>
-                <div>
-                  <p className="text-xs font-semibold text-stone-900">
-                    Select the available stitch or machine files for this design
-                  </p>
-                  <p className="text-[11px] text-stone-500">
-                    Automatic needle jump & color stop validation
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  disabled={isSimulatingUpload}
-                  onClick={handleSimulateFileUpload}
-                  className="px-4 py-2 bg-white border border-stone-300 text-stone-800 text-xs font-semibold rounded-lg shadow-xs hover:bg-stone-50"
-                >
-                  {isSimulatingUpload ? `Validating Punch (${uploadProgress}%)...` : 'Simulate File Re-upload'}
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* STEP 6: Review & Publish */}
-          {currentStep === 6 && (
-            <div className="space-y-6">
-              <div>
-                <h3 className="font-serif text-lg font-bold text-stone-900">
-                  Step 6: Review Listing Before Publishing
-                </h3>
-                <p className="text-xs text-stone-500">
-                  Confirm all technical parameters and preview image presentation.
-                </p>
-              </div>
-
-              {/* Preview Card */}
-              <div className="p-6 bg-stone-50 rounded-2xl border border-stone-200 space-y-6">
-                <div className="flex gap-4 items-start">
-                  <img
-                    src={images[0]}
-                    alt={title}
-                    className="w-24 h-24 rounded-xl object-cover border border-stone-300"
-                  />
-                  <div className="space-y-1">
-                    <span className="text-[10px] uppercase font-semibold text-amber-900 tracking-wider">
-                      {category} · {machine}
-                    </span>
-                    <h4 className="font-serif text-lg font-bold text-stone-900">
-                      {title || 'Untitled Design'}
-                    </h4>
-                    <p className="text-xs text-stone-500 line-clamp-2">
-                      {description || 'No description provided.'}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs pt-4 border-t border-stone-200">
-                  <div>
-                    <span className="text-stone-400 block text-[10px] uppercase">Stitch Count</span>
-                    <span className="font-mono font-bold text-stone-900">{stitches.toLocaleString()}</span>
-                  </div>
-                  <div>
-                    <span className="text-stone-400 block text-[10px] uppercase">Needles</span>
-                    <span className="font-mono font-bold text-stone-900">{needles} Needles</span>
-                  </div>
-                  <div>
-                    <span className="text-stone-400 block text-[10px] uppercase">Dimensions</span>
-                    <span className="font-mono font-bold text-stone-900">{heightMm}×{widthMm} mm</span>
-                  </div>
-                  <div>
-                    <span className="text-stone-400 block text-[10px] uppercase">Listing price</span>
-                    <span className="font-mono font-bold text-stone-900">₹{price}</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="pt-4 flex flex-col sm:flex-row gap-3">
-                <button
-                  type="button"
-                  onClick={() => handlePublish('active')}
-                  className="flex-1 py-3 px-4 bg-stone-900 hover:bg-stone-800 text-white font-semibold rounded-xl text-xs flex items-center justify-center gap-2 shadow-sm transition-colors"
-                >
-                  <UploadCloud className="w-4 h-4" />
-                  Save marketplace design
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handlePublish('draft')}
-                  className="py-3 px-4 bg-stone-100 hover:bg-stone-200 text-stone-800 font-semibold rounded-xl text-xs transition-colors"
-                >
-                  Save as Unpublished Draft
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Form Step Navigation Footer */}
-          <div className="mt-8 pt-6 border-t border-stone-100 flex items-center justify-between">
-            <button
-              type="button"
-              disabled={currentStep === 1}
-              onClick={() => setCurrentStep((prev) => Math.max(1, prev - 1))}
-              className="px-4 py-2 text-xs font-semibold text-stone-600 hover:text-stone-900 disabled:opacity-30 disabled:pointer-events-none flex items-center gap-1.5"
-            >
-              <ArrowLeft className="w-3.5 h-3.5" />
-              Previous Step
-            </button>
-
-            {currentStep < 6 && (
-              <button
-                type="button"
-                onClick={() => setCurrentStep((prev) => Math.min(6, prev + 1))}
-                className="px-6 py-2.5 bg-stone-900 hover:bg-stone-800 text-white font-semibold rounded-lg text-xs flex items-center gap-1.5 shadow-xs"
-              >
-                Next Step
-                <ArrowRight className="w-3.5 h-3.5" />
-              </button>
-            )}
+        <section className="rounded-2xl border border-stone-200 bg-white p-6">
+          <h2 className="font-serif text-xl font-semibold text-stone-950">Format, files and publishing</h2>
+          <div className="mt-5 grid gap-5 sm:grid-cols-2">
+            {config.sequenceType && <label className="text-sm font-semibold text-stone-700">Sequence type<input type="number" min="0" step="0.01" required={config.required.sequenceType} value={sequenceType} onChange={(event) => setSequenceType(event.target.value)} className="mt-2 w-full rounded-xl border border-stone-300 px-3 py-3 font-normal outline-none focus:border-amber-700" /><FieldError message={firstError('sequenceType')} /></label>}
+            {config.designFileType && <label className="text-sm font-semibold text-stone-700">Design file type<select required={config.required.designFileType} value={designFileTypeId} onChange={(event) => setDesignFileTypeId(event.target.value)} className="mt-2 w-full rounded-xl border border-stone-300 bg-white px-3 py-3 font-normal outline-none focus:border-amber-700"><option value="">Select file type</option>{fileTypes.map((item) => <option key={item.id} value={item.id}>{item.name}{item.extension ? ` (.${item.extension})` : ''}</option>)}</select><FieldError message={firstError('designFileTypeId')} /></label>}
+            <label className="text-sm font-semibold text-stone-700">Publish date<input type="date" value={publishDate} onChange={(event) => setPublishDate(event.target.value)} className="mt-2 w-full rounded-xl border border-stone-300 px-3 py-3 font-normal outline-none focus:border-amber-700" /><FieldError message={firstError('publishDate')} /></label>
           </div>
 
-        </div>
+          <div className="mt-6 grid gap-4 sm:grid-cols-2">
+            {config.previewImages && <UploadField label="Preview images" required={config.required.previewImages && existingImages.length === 0} multiple accept="image/*" files={previewFiles} existing={existingImages.map((item) => item.name)} onChange={setPreviewFiles} hint={previewFiles.length ? 'New images will replace the current preview set.' : 'Marketplace images shown before purchase.'} error={firstError('images') || firstError('imageUri')} />}
+            {config.stitchFiles && <UploadField label="Stitch files" required={config.required.stitchFiles && existingFiles.length === 0} multiple files={stitchFiles} existing={existingFiles.map((item) => item.name)} onChange={setStitchFiles} hint={stitchFiles.length ? 'New files will replace the current stitch-file set.' : 'Buyers receive these protected files after purchase.'} error={firstError('files') || firstError('fileUri')} />}
+          </div>
+        </section>
 
-      </div>
-    </div>
+        {config.pricing && (
+          <section className="rounded-2xl border border-stone-200 bg-white p-6">
+            <h2 className="font-serif text-xl font-semibold text-stone-950">Pricing</h2>
+            <div className="mt-5 grid gap-5 sm:grid-cols-2">
+              <label className="text-sm font-semibold text-stone-700">Selling price (INR)<input type="number" min="1" step="0.01" required={config.required.pricing} value={priceRupees} onChange={(event) => setPriceRupees(event.target.value)} className="mt-2 w-full rounded-xl border border-stone-300 px-3 py-3 font-mono font-normal outline-none focus:border-amber-700" /><FieldError message={firstError('pricePaise')} /></label>
+              <label className="flex items-center gap-3 self-end rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm font-semibold text-stone-700"><input type="checkbox" checked={showPrice} onChange={(event) => setShowPrice(event.target.checked)} className="h-4 w-4 accent-stone-950" />Show price in marketplace</label>
+            </div>
+            {pricing && <div className="mt-5 grid gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm sm:grid-cols-3"><div><span className="text-stone-500">Selling price</span><strong className="mt-1 block font-mono">{money(pricing.itemPricePaise)}</strong></div><div><span className="text-stone-500">Platform commission ({pricing.platformCommission.percent}%)</span><strong className="mt-1 block font-mono text-rose-700">−{money(pricing.platformCommission.amountPaise)}</strong></div><div><span className="text-stone-500">Estimated earning</span><strong className="mt-1 block font-mono text-emerald-700">{money(pricing.estimatedSellerEarningPaise)}</strong></div><p className="sm:col-span-3 text-xs text-amber-950">{pricing.notice}</p></div>}
+          </section>
+        )}
+
+        <div className="flex items-center justify-end gap-3"><Link to="/studio/designs" className="rounded-xl px-5 py-3 text-sm font-semibold text-stone-600 hover:bg-stone-100">Cancel</Link><button type="submit" disabled={submitting} className="inline-flex items-center rounded-xl bg-stone-950 px-6 py-3 text-sm font-semibold text-white hover:bg-amber-900 disabled:opacity-60">{submitting ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}{submitting ? 'Uploading and saving…' : (isEdit ? 'Save changes' : 'Publish design')}</button></div>
+      </form>
+    </main>
   );
 };
+
+const FieldError = ({ message }: { message?: string }) => message ? <span className="mt-1 block text-xs font-normal text-rose-700">{message}</span> : null;
+
+const UploadField = ({ label, required, multiple, accept, files, existing, onChange, hint, error }: {
+  label: string; required: boolean; multiple?: boolean; accept?: string; files: File[]; existing: string[]; onChange: (files: File[]) => void; hint: string; error?: string;
+}) => (
+  <label className="block cursor-pointer rounded-xl border border-dashed border-stone-300 bg-stone-50 p-5 text-center hover:border-amber-600">
+    <UploadCloud className="mx-auto h-6 w-6 text-amber-800" /><span className="mt-2 block text-sm font-semibold text-stone-800">{label}</span>
+    <span className="mt-1 block text-xs text-stone-500">{files.length ? files.map((file) => file.name).join(', ') : existing.length ? `Current: ${existing.join(', ')}` : 'Choose files'}</span>
+    <span className="mt-2 block text-[11px] text-stone-400">{hint}</span><FieldError message={error} />
+    <input type="file" required={required} multiple={multiple} accept={accept} onChange={(event) => onChange(Array.from(event.target.files ?? []))} className="sr-only" />
+  </label>
+);
+
+const VariantCard = ({ index, value, config, error, onChange, onRemove }: {
+  index: number; value: VariantForm; config: DesignFormConfig; error?: string; onChange: (patch: Partial<VariantForm>) => void; onRemove: () => void;
+}) => {
+  const fields = config.specificationFields;
+  const [filePreview, setFilePreview] = useState<string | null>(null);
+  useEffect(() => {
+    if (!value.imageFile) {
+      setFilePreview(null);
+      return;
+    }
+    const url = URL.createObjectURL(value.imageFile);
+    setFilePreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [value.imageFile]);
+  const imagePreview = filePreview || value.existingImage?.thumbnailUri || value.existingImage?.uri;
+  return (
+    <article className="rounded-xl border border-stone-200 bg-stone-50 p-5">
+      <div className="flex items-center justify-between"><div><p className="text-xs uppercase tracking-wider text-stone-400">Type {index + 1}</p><h3 className="font-serif text-lg font-semibold text-stone-950">{value.typeName}</h3></div><button type="button" onClick={onRemove} className="rounded-lg p-2 text-stone-400 hover:bg-rose-50 hover:text-rose-700" aria-label={`Remove ${value.typeName}`}><Trash2 className="h-4 w-4" /></button></div>
+      {config.designSpecifications && <div className="mt-4 grid gap-4 sm:grid-cols-3">
+        {fields.nameOrNumber && <SpecInput label="Name or number" required={fields.required.nameOrNumber} value={value.nameOrNumber} onChange={(next) => onChange({ nameOrNumber: next })} />}
+        {fields.stitchCount && <SpecInput label="Stitch count" type="number" required={fields.required.stitchCount} value={value.stitchCount} onChange={(next) => onChange({ stitchCount: next })} />}
+        {fields.needle && <SpecInput label="Needle" type="number" required={fields.required.needle} value={value.needle} onChange={(next) => onChange({ needle: next })} />}
+        {fields.area && <SpecInput label="Area (mm)" type="number" step="0.01" required={fields.required.area} value={value.area} onChange={(next) => onChange({ area: next })} />}
+        {fields.height && <SpecInput label="Height (mm)" type="number" step="0.01" required={fields.required.height} value={value.height} onChange={(next) => onChange({ height: next })} />}
+        {fields.width && <SpecInput label="Width (mm)" type="number" step="0.01" required={fields.required.width} value={value.width} onChange={(next) => onChange({ width: next })} />}
+        {fields.image && <div className="sm:col-span-3"><div className="flex flex-col gap-4 rounded-xl border border-stone-200 bg-white p-4 sm:flex-row sm:items-center">{imagePreview && !value.removeImage ? <img src={imagePreview} alt="" className="h-24 w-24 rounded-lg border border-stone-200 object-cover" /> : <span className="flex h-24 w-24 items-center justify-center rounded-lg bg-stone-100"><ImageIcon className="h-6 w-6 text-stone-400" /></span>}<div className="flex-1"><p className="text-sm font-semibold text-stone-800">Design-type image {fields.required.image ? '(required)' : '(optional)'}</p><p className="mt-1 text-xs text-stone-500">{value.imageFile?.name || value.existingImage?.name || 'No image selected'}</p><div className="mt-3 flex flex-wrap gap-2"><label className="cursor-pointer rounded-lg bg-stone-950 px-3 py-2 text-xs font-semibold text-white">{value.existingImage || value.imageFile ? 'Replace image' : 'Select image'}<input type="file" accept="image/*" required={fields.required.image && !value.existingImage} onChange={(event) => onChange({ imageFile: event.target.files?.[0] || null, removeImage: false })} className="sr-only" /></label>{!fields.required.image && (value.existingImage || value.imageFile) && <button type="button" onClick={() => onChange({ imageFile: null, removeImage: Boolean(value.existingImage) })} className="rounded-lg border border-stone-300 px-3 py-2 text-xs font-semibold text-stone-600">Remove</button>}</div></div></div></div>}
+      </div>}
+      <FieldError message={error} />
+    </article>
+  );
+};
+
+const SpecInput = ({ label, value, onChange, type = 'text', step, required }: {
+  label: string; value: VariantValue; onChange: (value: string) => void; type?: string; step?: string; required: boolean;
+}) => <label className="text-sm font-semibold text-stone-700">{label}<input type={type} min={type === 'number' ? 0 : undefined} step={step} required={required} value={value} onChange={(event) => onChange(event.target.value)} className="mt-2 w-full rounded-xl border border-stone-300 bg-white px-3 py-2.5 font-normal outline-none focus:border-amber-700" /></label>;

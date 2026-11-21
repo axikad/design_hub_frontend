@@ -1,6 +1,6 @@
 # DesignHub Frontend UI Audit and Integration Roadmap
 
-Status: Phase 1 UI correction implemented and build-verified on 20 November 2026. API integration remains intentionally deferred.
+Status: Phases 1 through 5 are implemented and build-verified as of 21 November 2026. Phase 6 wallet integration is next.
 
 Reviewed sources:
 
@@ -420,6 +420,16 @@ Implementation status (20 November 2026): implemented and build-verified; one li
 - Remove mock seller CRUD.
 
 Exit condition: seller can manage only their own records and all validation comes from the server contract.
+
+Implementation status (21 November 2026): implemented and build-verified; live deployment acceptance remains.
+
+- Connected the studio dashboard, paginated own-design inventory and paginated own-folder inventory to authenticated server records.
+- Rebuilt design create/edit around each machine's normalized `designFormConfig`, catalog relationships and per-design-type specifications.
+- Files and per-type images now use upload staging before design create/update; existing owner attachments are preserved safely during edits.
+- Seller pricing estimates come from `/seller/pricing-preview`; no commission value is calculated in the browser.
+- Connected server-backed design deletion and ZIP/RAR folder creation with response-driven success and validation errors.
+- Added the authenticated `GET /users/me/folders` backend contract so one seller cannot list another seller's folder inventory.
+- Removed the mock seller create/update/delete actions from the active frontend context.
 
 ### Phase 6 — Wallet and settlements
 

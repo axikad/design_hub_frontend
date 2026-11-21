@@ -75,10 +75,6 @@ interface AppContextType {
   isSaved: (id: string) => boolean;
   isPurchased: (id: string) => boolean;
   addPurchase: (item: DesignItem | CollectionItem, type: 'design' | 'collection', amount: number) => PurchaseRecord;
-  addDesign: (design: Omit<DesignItem, 'id' | 'createdAt' | 'salesCount' | 'sellerId' | 'sellerName' | 'sellerAvatar' | 'sellerRating'>) => DesignItem;
-  updateDesign: (id: string, updates: Partial<DesignItem>) => void;
-  deleteDesign: (id: string) => void;
-  addCollection: (collection: Omit<CollectionItem, 'id' | 'createdAt' | 'salesCount' | 'sellerId' | 'sellerName' | 'sellerAvatar'>) => CollectionItem;
   requestWithdrawal: (amount: number, bank: string) => boolean;
   cancelWithdrawal: (id: string) => void;
   setSettlementMode: (mode: 'manual' | 'automatic') => void;
@@ -341,51 +337,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return newRecord;
   };
 
-  const addDesign = (designData: Omit<DesignItem, 'id' | 'createdAt' | 'salesCount' | 'sellerId' | 'sellerName' | 'sellerAvatar' | 'sellerRating'>): DesignItem => {
-    const newDesign: DesignItem = {
-      ...designData,
-      id: 'des-' + Date.now().toString().slice(-4),
-      sellerId: user.id,
-      sellerName: user.name,
-      sellerAvatar: user.avatar,
-      sellerRating: 5.0,
-      salesCount: 0,
-      createdAt: new Date().toISOString().split('T')[0],
-      buyerProtection: 'File details and access terms will be supplied by the server.',
-    };
-
-    setDesigns((prev) => [newDesign, ...prev]);
-    showToast('Design Published', `"${newDesign.title}" is now active in the marketplace.`, 'success');
-    return newDesign;
-  };
-
-  const updateDesign = (id: string, updates: Partial<DesignItem>) => {
-    setDesigns((prev) =>
-      prev.map((d) => (d.id === id ? { ...d, ...updates } : d))
-    );
-    showToast('Design Updated', 'Changes have been saved to your design listing.', 'success');
-  };
-
-  const deleteDesign = (id: string) => {
-    setDesigns((prev) => prev.filter((d) => d.id !== id));
-    showToast('Design Deleted', 'The design listing was removed from the marketplace.', 'info');
-  };
-
-  const addCollection = (colData: Omit<CollectionItem, 'id' | 'createdAt' | 'salesCount' | 'sellerId' | 'sellerName' | 'sellerAvatar'>): CollectionItem => {
-    const newCol: CollectionItem = {
-      ...colData,
-      id: 'col-' + Date.now().toString().slice(-4),
-      sellerId: user.id,
-      sellerName: user.name,
-      sellerAvatar: user.avatar,
-      salesCount: 0,
-      createdAt: new Date().toISOString().split('T')[0],
-    };
-    setCollections((prev) => [newCol, ...prev]);
-    showToast('Collection Created', `Collection "${newCol.title}" created with ${newCol.designCount} designs.`, 'success');
-    return newCol;
-  };
-
   const requestWithdrawal = (amount: number, bank: string): boolean => {
     if (amount < 1000) {
       showToast('Minimum Withdrawal ₹1,000', 'Please enter at least ₹1,000 for withdrawal.', 'error');
@@ -517,10 +468,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         isSaved,
         isPurchased,
         addPurchase,
-        addDesign,
-        updateDesign,
-        deleteDesign,
-        addCollection,
         requestWithdrawal,
         cancelWithdrawal,
         setSettlementMode,

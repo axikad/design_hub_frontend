@@ -24,6 +24,16 @@ import type {
   PaymentVerification,
   PurchaseStatus,
 } from '../types/commerce';
+import type {
+  DesignEnvelope,
+  DesignOptionItem,
+  DesignOptions,
+  FolderEnvelope,
+  MyDesignsEnvelope,
+  MyFoldersEnvelope,
+  PricingPreview,
+  UploadResult,
+} from '../types/studio';
 
 const configuredBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim();
 export const API_BASE_URL = (configuredBaseUrl || 'https://app.designshub.org/api/v1').replace(/\/$/, '');
@@ -178,6 +188,41 @@ export const commerceApi = {
     apiRequest<ApiEnvelope<DesignDownloadGrant>>(`designs/${encodeURIComponent(id)}/images/${imageIndex}/download`, { method: 'POST', authenticated: true }),
   downloadFolder: (id: string) =>
     apiRequest<ApiEnvelope<FolderDownloadGrant>>(`folders/${encodeURIComponent(id)}/download`, { method: 'POST', authenticated: true }),
+};
+
+export const studioApi = {
+  designOptions: (signal?: AbortSignal) =>
+    apiRequest<ApiEnvelope<DesignOptions>>('catalog/design-options', { signal, authenticated: true }),
+  categoryTypes: (categoryId: string, signal?: AbortSignal) =>
+    apiRequest<ApiEnvelope<DesignOptionItem[]>>(`catalog/categories/${encodeURIComponent(categoryId)}/types`, { signal, authenticated: true }),
+  machineFileTypes: (machineId: string, signal?: AbortSignal) =>
+    apiRequest<ApiEnvelope<DesignOptionItem[]>>(`catalog/machines/${encodeURIComponent(machineId)}/design-file-types`, { signal, authenticated: true }),
+  myDesigns: (query: Query = {}, signal?: AbortSignal) =>
+    apiRequest<MyDesignsEnvelope>('users/me/designs', { query, signal, authenticated: true }),
+  design: (id: string, signal?: AbortSignal) =>
+    apiRequest<DesignEnvelope>(`designs/${encodeURIComponent(id)}`, { signal, authenticated: true }),
+  createDesign: (body: Record<string, unknown>) =>
+    apiRequest<DesignEnvelope>('designs', { method: 'POST', body, authenticated: true }),
+  updateDesign: (id: string, body: Record<string, unknown>) =>
+    apiRequest<DesignEnvelope>(`designs/${encodeURIComponent(id)}`, { method: 'PATCH', body, authenticated: true }),
+  deleteDesign: (id: string) =>
+    apiRequest<ApiEnvelope<{ message: string }>>(`designs/${encodeURIComponent(id)}`, { method: 'DELETE', authenticated: true }),
+  upload: (file: File) => {
+    const body = new FormData();
+    body.append('file', file);
+    return apiRequest<ApiEnvelope<UploadResult>>('uploads', { method: 'POST', body, authenticated: true });
+  },
+  pricingPreview: (pricePaise: number, signal?: AbortSignal) =>
+    apiRequest<ApiEnvelope<PricingPreview>>('seller/pricing-preview', { query: { pricePaise }, signal, authenticated: true }),
+  myFolders: (query: Query = {}, signal?: AbortSignal) =>
+    apiRequest<MyFoldersEnvelope>('users/me/folders', { query, signal, authenticated: true }),
+  createFolder: (name: string, pricePaise: number, file: File) => {
+    const body = new FormData();
+    body.append('name', name);
+    body.append('pricePaise', String(pricePaise));
+    body.append('file', file);
+    return apiRequest<FolderEnvelope>('folders', { method: 'POST', body, authenticated: true });
+  },
 };
 
 export const getErrorMessage = (error: unknown) =>

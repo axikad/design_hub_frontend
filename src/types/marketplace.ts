@@ -1,6 +1,7 @@
 export interface ApiImage {
   name: string;
   uri: string;
+  sourceUri?: string | null;
   thumbnailUri?: string | null;
   isWatermarked?: boolean;
   downloadUri?: string | null;
