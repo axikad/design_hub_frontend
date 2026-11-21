@@ -76,7 +76,7 @@ export const HomePage: React.FC = () => {
     () => [...(home?.categories ?? [])]
       .filter((category) => category.total > 0 && category.items.length > 0)
       .sort((first, second) => second.total - first.total || first.name.localeCompare(second.name))
-      .slice(0, 3)
+      .slice(0, 2)
       .map((category) => ({
         ...category,
         designs: category.items.map((design) => toDesignCard(design, filters)),
