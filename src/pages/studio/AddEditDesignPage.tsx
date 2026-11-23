@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, Image as ImageIcon, LoaderCircle, Plus, Save, Trash2, UploadCloud } from 'lucide-react';
+import { ArrowLeft, CalendarDays, FileArchive, Image as ImageIcon, Layers3, LoaderCircle, Plus, Save, Tag, Trash2, UploadCloud, UserRound } from 'lucide-react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { StudioNavigation } from '../../components/studio/StudioNavigation';
 import { useApp } from '../../context/AppContext';
 import { ApiError, getErrorMessage, studioApi } from '../../lib/api-client';
+import { normalizeAssetUrl } from '../../lib/marketplace-mappers';
 import type { ApiDesign, ApiImage } from '../../types/marketplace';
 import type { DesignFormConfig, DesignOptionItem, DesignOptions, PricingPreview } from '../../types/studio';
 
@@ -300,79 +301,92 @@ export const AddEditDesignPage: React.FC = () => {
     <main className="min-h-screen bg-[#FAF8F5] pb-24">
       <StudioNavigation />
       <header className="border-b border-stone-200 bg-white py-6">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-4 sm:px-6">
+        <div className="mx-auto flex max-w-4xl items-center justify-between px-4 sm:px-6">
           <div className="flex items-center gap-3"><Link to="/studio/designs" className="rounded-lg p-2 text-stone-500 hover:bg-stone-100"><ArrowLeft className="h-5 w-5" /></Link><div><p className="text-xs font-bold uppercase tracking-wider text-amber-800">Creator studio</p><h1 className="font-serif text-2xl font-semibold text-stone-950">{isEdit ? 'Edit design' : 'Add design'}</h1></div></div>
           {existingDesign && <Link to={`/design/${existingDesign.id}`} className="text-sm font-semibold text-amber-900 hover:underline">Public preview</Link>}
         </div>
       </header>
 
-      <form onSubmit={(event) => void submit(event)} className="mx-auto max-w-5xl space-y-6 px-4 pt-8 sm:px-6">
-        <section className="rounded-2xl border border-stone-200 bg-white p-6">
-          <h2 className="font-serif text-xl font-semibold text-stone-950">Machine and classification</h2>
-          <div className="mt-5 grid gap-4 sm:grid-cols-2">
+      <form onSubmit={(event) => void submit(event)} className="mx-auto max-w-4xl space-y-5 px-4 pt-8 sm:px-6">
+        {config.title && <FormPanel title="Design details" description="Enter the enabled details for this marketplace design." icon={UserRound}>
+          <label className="block max-w-xl text-sm font-semibold text-stone-700">Title<input required={config.required.title} value={title} onChange={(event) => setTitle(event.target.value)} maxLength={120} placeholder="Enter design title" className="mt-2 w-full rounded-xl border border-stone-300 px-3 py-3 font-normal outline-none focus:border-amber-700" /><FieldError message={firstError('title')} /></label>
+        </FormPanel>}
+
+        <FormPanel title="Catalog classification" description="Selections are linked: Machine → Machine Type → Category → Design Type." icon={Layers3}>
+          <div className="grid gap-5 sm:grid-cols-3">
             <label className="text-sm font-semibold text-stone-700">Machine<select required value={machineId} onChange={(event) => selectMachine(event.target.value)} className="mt-2 w-full rounded-xl border border-stone-300 bg-white px-3 py-3 font-normal outline-none focus:border-amber-700">{options.machines.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select><FieldError message={firstError('machineId')} /></label>
             {config.machineType && <label className="text-sm font-semibold text-stone-700">Machine type<select required={config.required.machineType} value={machineTypeId} onChange={(event) => selectMachineType(event.target.value)} className="mt-2 w-full rounded-xl border border-stone-300 bg-white px-3 py-3 font-normal outline-none focus:border-amber-700"><option value="">Select machine type</option>{machineTypes.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select><FieldError message={firstError('machineTypeId')} /></label>}
             {config.category && <label className="text-sm font-semibold text-stone-700">Category<select required={config.required.category} value={categoryId} onChange={(event) => selectCategory(event.target.value)} className="mt-2 w-full rounded-xl border border-stone-300 bg-white px-3 py-3 font-normal outline-none focus:border-amber-700"><option value="">Select category</option>{categories.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select><FieldError message={firstError('categoryId')} /></label>}
-            {config.title && <label className="text-sm font-semibold text-stone-700">Title<input required={config.required.title} value={title} onChange={(event) => setTitle(event.target.value)} maxLength={120} className="mt-2 w-full rounded-xl border border-stone-300 px-3 py-3 font-normal outline-none focus:border-amber-700" /><FieldError message={firstError('title')} /></label>}
           </div>
-        </section>
+          {config.designTypes && <div className="mt-5"><p className="text-sm font-semibold text-stone-700">Design types</p><p className="mt-1 text-xs text-stone-500">Select every type included in this design.</p><div className="mt-3 flex flex-wrap gap-2">{designTypes.map((type) => <button key={type.id} type="button" onClick={() => toggleType(type)} className={`rounded-full border px-4 py-2 text-sm font-semibold transition ${variants.some((item) => item.typeId === type.id) ? 'border-stone-950 bg-stone-950 text-white' : 'border-stone-300 bg-white text-stone-700 hover:border-amber-700'}`}>{type.name}</button>)}</div>{variants.some((item) => !item.typeId) && <div className="mt-3 flex flex-wrap gap-2">{variants.filter((item) => !item.typeId).map((variant) => <button key={variant.key} type="button" title="Remove custom type" onClick={() => setVariants((current) => current.filter((item) => item.key !== variant.key))} className="rounded-full border border-amber-700 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-950">{variant.customTypeName} ×</button>)}</div>}<div className="mt-4 flex max-w-lg gap-2"><input value={customType} onChange={(event) => setCustomType(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); addCustomType(); } }} placeholder="Optional custom type" className="min-w-0 flex-1 rounded-xl border border-stone-300 px-3 py-2.5 text-sm outline-none focus:border-amber-700" /><button type="button" onClick={addCustomType} className="inline-flex items-center rounded-xl border border-stone-300 px-4 text-sm font-semibold hover:border-amber-700"><Plus className="mr-1 h-4 w-4" />Add custom</button></div><FieldError message={firstError('designTypes')} /></div>}
+        </FormPanel>
 
-        {config.designTypes && (
-          <section className="rounded-2xl border border-stone-200 bg-white p-6">
-            <h2 className="font-serif text-xl font-semibold text-stone-950">Design types</h2>
-            <p className="mt-1 text-sm text-stone-500">Select every type included in this design. Each type keeps its own specifications.</p>
-            <div className="mt-4 flex flex-wrap gap-2">{designTypes.map((type) => <button key={type.id} type="button" onClick={() => toggleType(type)} className={`rounded-full border px-4 py-2 text-sm font-semibold ${variants.some((item) => item.typeId === type.id) ? 'border-stone-950 bg-stone-950 text-white' : 'border-stone-300 bg-white text-stone-700 hover:border-amber-700'}`}>{type.name}</button>)}</div>
-            <div className="mt-4 flex max-w-lg gap-2"><input value={customType} onChange={(event) => setCustomType(event.target.value)} placeholder="Optional custom type" className="min-w-0 flex-1 rounded-xl border border-stone-300 px-3 py-2.5 text-sm outline-none focus:border-amber-700" /><button type="button" onClick={addCustomType} className="inline-flex items-center rounded-xl border border-stone-300 px-4 text-sm font-semibold"><Plus className="mr-1 h-4 w-4" />Add</button></div>
-            <FieldError message={firstError('designTypes')} />
-
-            <div className="mt-6 space-y-4">
+        {config.designSpecifications && variants.length > 0 && (
+          <FormPanel title="Design type specifications" description="Enter specifications and one image for every catalog or custom design type." icon={Layers3}>
+            <div className="space-y-4">
               {variants.map((variant, index) => <VariantCard key={variant.key} index={index} value={variant} config={config} error={firstError(`designTypes.${index}`)} onChange={(patch) => updateVariant(index, patch)} onRemove={() => setVariants((current) => current.filter((_, itemIndex) => itemIndex !== index))} />)}
             </div>
-          </section>
+          </FormPanel>
         )}
 
-        <section className="rounded-2xl border border-stone-200 bg-white p-6">
-          <h2 className="font-serif text-xl font-semibold text-stone-950">Format, files and publishing</h2>
-          <div className="mt-5 grid gap-5 sm:grid-cols-2">
-            {config.sequenceType && <label className="text-sm font-semibold text-stone-700">Sequence type<input type="number" min="0" step="0.01" required={config.required.sequenceType} value={sequenceType} onChange={(event) => setSequenceType(event.target.value)} className="mt-2 w-full rounded-xl border border-stone-300 px-3 py-3 font-normal outline-none focus:border-amber-700" /><FieldError message={firstError('sequenceType')} /></label>}
-            {config.designFileType && <label className="text-sm font-semibold text-stone-700">Design file type<select required={config.required.designFileType} value={designFileTypeId} onChange={(event) => setDesignFileTypeId(event.target.value)} className="mt-2 w-full rounded-xl border border-stone-300 bg-white px-3 py-3 font-normal outline-none focus:border-amber-700"><option value="">Select file type</option>{fileTypes.map((item) => <option key={item.id} value={item.id}>{item.name}{item.extension ? ` (.${item.extension})` : ''}</option>)}</select><FieldError message={firstError('designFileTypeId')} /></label>}
-            <label className="text-sm font-semibold text-stone-700">Publish date<input type="date" value={publishDate} onChange={(event) => setPublishDate(event.target.value)} className="mt-2 w-full rounded-xl border border-stone-300 px-3 py-3 font-normal outline-none focus:border-amber-700" /><FieldError message={firstError('publishDate')} /></label>
-          </div>
+        {config.sequenceType && <FormPanel title="Design measurement" description="This sequence value applies once to the complete design." icon={Layers3}>
+          <label className="block max-w-xs text-sm font-semibold text-stone-700">Sequence type<div className="relative mt-2"><input type="number" min="0" step="0.01" required={config.required.sequenceType} value={sequenceType} onChange={(event) => setSequenceType(event.target.value)} className="w-full rounded-xl border border-stone-300 px-3 py-3 pr-14 font-normal outline-none focus:border-amber-700" /><span className="pointer-events-none absolute inset-y-0 right-0 flex items-center border-l border-stone-200 px-3 text-sm text-stone-500">mm</span></div><FieldError message={firstError('sequenceType')} /></label>
+        </FormPanel>}
 
-          <div className="mt-6 grid gap-4 sm:grid-cols-2">
-            {config.previewImages && <UploadField label="Preview images" required={config.required.previewImages && existingImages.length === 0} multiple accept="image/*" files={previewFiles} existing={existingImages.map((item) => item.name)} onChange={setPreviewFiles} hint={previewFiles.length ? 'New images will replace the current preview set.' : 'Marketplace images shown before purchase.'} error={firstError('images') || firstError('imageUri')} />}
-            {config.stitchFiles && <UploadField label="Stitch files" required={config.required.stitchFiles && existingFiles.length === 0} multiple files={stitchFiles} existing={existingFiles.map((item) => item.name)} onChange={setStitchFiles} hint={stitchFiles.length ? 'New files will replace the current stitch-file set.' : 'Buyers receive these protected files after purchase.'} error={firstError('files') || firstError('fileUri')} />}
-          </div>
-        </section>
-
-        {config.pricing && (
-          <section className="rounded-2xl border border-stone-200 bg-white p-6">
-            <h2 className="font-serif text-xl font-semibold text-stone-950">Pricing</h2>
-            <div className="mt-5 grid gap-5 sm:grid-cols-2">
-              <label className="text-sm font-semibold text-stone-700">Selling price (INR)<input type="number" min="1" step="0.01" required={config.required.pricing} value={priceRupees} onChange={(event) => setPriceRupees(event.target.value)} className="mt-2 w-full rounded-xl border border-stone-300 px-3 py-3 font-mono font-normal outline-none focus:border-amber-700" /><FieldError message={firstError('pricePaise')} /></label>
-              <label className="flex items-center gap-3 self-end rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm font-semibold text-stone-700"><input type="checkbox" checked={showPrice} onChange={(event) => setShowPrice(event.target.checked)} className="h-4 w-4 accent-stone-950" />Show price in marketplace</label>
+        {(config.pricing || config.designFileType) && (
+          <FormPanel title="Pricing and format" description="Set the enabled marketplace pricing and format fields." icon={Tag}>
+            <div className="grid gap-5 sm:grid-cols-2">
+              {config.pricing && <div><label className="text-sm font-semibold text-stone-700">Selling price (INR)<input type="number" min="1" step="0.01" required={config.required.pricing} value={priceRupees} onChange={(event) => setPriceRupees(event.target.value)} className="mt-2 w-full rounded-xl border border-stone-300 px-3 py-3 font-mono font-normal outline-none focus:border-amber-700" /><FieldError message={firstError('pricePaise')} /></label><label className="mt-3 flex items-center gap-3 rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm font-semibold text-stone-700"><input type="checkbox" checked={showPrice} onChange={(event) => setShowPrice(event.target.checked)} className="h-4 w-4 accent-stone-950" />Show price in marketplace</label></div>}
+              {config.designFileType && <label className="text-sm font-semibold text-stone-700">Design file type<select required={config.required.designFileType} value={designFileTypeId} onChange={(event) => setDesignFileTypeId(event.target.value)} className="mt-2 w-full rounded-xl border border-stone-300 bg-white px-3 py-3 font-normal outline-none focus:border-amber-700"><option value="">Select file type</option>{fileTypes.map((item) => <option key={item.id} value={item.id}>{item.name}{item.extension ? ` (.${item.extension})` : ''}</option>)}</select><FieldError message={firstError('designFileTypeId')} />{!fileTypes.length && <span className="mt-2 block text-xs font-normal text-amber-700">No active file type is connected to this machine.</span>}</label>}
             </div>
             {pricing && <div className="mt-5 grid gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm sm:grid-cols-3"><div><span className="text-stone-500">Selling price</span><strong className="mt-1 block font-mono">{money(pricing.itemPricePaise)}</strong></div><div><span className="text-stone-500">Platform commission ({pricing.platformCommission.percent}%)</span><strong className="mt-1 block font-mono text-rose-700">−{money(pricing.platformCommission.amountPaise)}</strong></div><div><span className="text-stone-500">Estimated earning</span><strong className="mt-1 block font-mono text-emerald-700">{money(pricing.estimatedSellerEarningPaise)}</strong></div><p className="sm:col-span-3 text-xs text-amber-950">{pricing.notice}</p></div>}
-          </section>
+          </FormPanel>
         )}
 
-        <div className="flex items-center justify-end gap-3"><Link to="/studio/designs" className="rounded-xl px-5 py-3 text-sm font-semibold text-stone-600 hover:bg-stone-100">Cancel</Link><button type="submit" disabled={submitting} className="inline-flex items-center rounded-xl bg-stone-950 px-6 py-3 text-sm font-semibold text-white hover:bg-amber-900 disabled:opacity-60">{submitting ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}{submitting ? 'Uploading and saving…' : (isEdit ? 'Save changes' : 'Publish design')}</button></div>
+        <FormPanel title="Publishing" description="Choose when this design appears in the marketplace." icon={CalendarDays}>
+          <label className="block max-w-xs text-sm font-semibold text-stone-700">Publish date<input type="date" value={publishDate} onChange={(event) => setPublishDate(event.target.value)} className="mt-2 w-full rounded-xl border border-stone-300 px-3 py-3 font-normal outline-none focus:border-amber-700" /><FieldError message={firstError('publishDate')} /></label>
+        </FormPanel>
+
+        {(config.previewImages || config.stitchFiles) && <div className="grid gap-5 lg:grid-cols-2">
+          {config.previewImages && <FormPanel title="Preview images" description={isEdit ? 'Select new images only when you want to replace all current preview images.' : 'Upload marketplace preview images.'} icon={ImageIcon}><UploadField label="Choose preview images" required={config.required.previewImages && existingImages.length === 0} multiple accept="image/*" files={previewFiles} existing={existingImages.map((item) => item.name)} existingPreviews={existingImages.map((item) => ({ name: item.name, src: normalizeAssetUrl(item.thumbnailUri || item.uri) })).filter((item): item is { name: string; src: string } => Boolean(item.src))} onChange={setPreviewFiles} hint={previewFiles.length ? 'New images will replace the current preview set.' : 'Marketplace images shown before purchase.'} error={firstError('images') || firstError('imageUri')} /></FormPanel>}
+          {config.stitchFiles && <FormPanel title="Stitch files" description={isEdit ? 'Select new files only when you want to replace all current stitch files.' : 'Upload downloadable machine files.'} icon={FileArchive}><UploadField label="Choose stitch files" required={config.required.stitchFiles && existingFiles.length === 0} multiple files={stitchFiles} existing={existingFiles.map((item) => item.name)} onChange={setStitchFiles} hint={stitchFiles.length ? 'New files will replace the current stitch-file set.' : 'Buyers receive these protected files after purchase.'} error={firstError('files') || firstError('fileUri')} /></FormPanel>}
+        </div>}
+
+        <div className="flex items-center justify-end gap-3 pb-2"><Link to="/studio/designs" className="rounded-xl border border-stone-300 bg-white px-5 py-3 text-sm font-semibold text-stone-700 hover:bg-stone-50">Cancel</Link><button type="submit" disabled={submitting} className="inline-flex items-center rounded-xl bg-stone-950 px-6 py-3 text-sm font-semibold text-white hover:bg-amber-900 disabled:opacity-60">{submitting ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}{submitting ? 'Uploading and saving…' : (isEdit ? 'Save changes' : 'Create design')}</button></div>
       </form>
     </main>
   );
 };
 
+const FormPanel = ({ title, description, icon: Icon, children }: {
+  title: string;
+  description?: string;
+  icon: React.ComponentType<{ className?: string }>;
+  children: React.ReactNode;
+}) => (
+  <section className="overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm">
+    <div className="flex items-start gap-3 border-b border-stone-100 px-5 py-4">
+      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-800"><Icon className="h-[18px] w-[18px]" /></div>
+      <div><h2 className="text-sm font-bold text-stone-950">{title}</h2>{description && <p className="mt-1 text-xs leading-5 text-stone-500">{description}</p>}</div>
+    </div>
+    <div className="p-5">{children}</div>
+  </section>
+);
+
 const FieldError = ({ message }: { message?: string }) => message ? <span className="mt-1 block text-xs font-normal text-rose-700">{message}</span> : null;
 
-const UploadField = ({ label, required, multiple, accept, files, existing, onChange, hint, error }: {
-  label: string; required: boolean; multiple?: boolean; accept?: string; files: File[]; existing: string[]; onChange: (files: File[]) => void; hint: string; error?: string;
+const UploadField = ({ label, required, multiple, accept, files, existing, existingPreviews = [], onChange, hint, error }: {
+  label: string; required: boolean; multiple?: boolean; accept?: string; files: File[]; existing: string[]; existingPreviews?: Array<{ name: string; src: string }>; onChange: (files: File[]) => void; hint: string; error?: string;
 }) => (
-  <label className="block cursor-pointer rounded-xl border border-dashed border-stone-300 bg-stone-50 p-5 text-center hover:border-amber-600">
-    <UploadCloud className="mx-auto h-6 w-6 text-amber-800" /><span className="mt-2 block text-sm font-semibold text-stone-800">{label}</span>
-    <span className="mt-1 block text-xs text-stone-500">{files.length ? files.map((file) => file.name).join(', ') : existing.length ? `Current: ${existing.join(', ')}` : 'Choose files'}</span>
-    <span className="mt-2 block text-[11px] text-stone-400">{hint}</span><FieldError message={error} />
-    <input type="file" required={required} multiple={multiple} accept={accept} onChange={(event) => onChange(Array.from(event.target.files ?? []))} className="sr-only" />
-  </label>
+  <div>
+    {existingPreviews.length > 0 && files.length === 0 && <div className="mb-4 grid grid-cols-3 gap-2">{existingPreviews.map((item, index) => <div key={`${item.name}-${index}`} className="min-w-0"><img src={item.src} alt={item.name} className="h-20 w-full rounded-xl border border-stone-200 object-cover" /><p className="mt-1 truncate text-[10px] text-stone-500" title={item.name}>{item.name}</p></div>)}</div>}
+    <label className="block cursor-pointer rounded-xl border border-dashed border-stone-300 bg-stone-50 p-5 text-center transition hover:border-amber-600 hover:bg-amber-50/30">
+      <UploadCloud className="mx-auto h-6 w-6 text-amber-800" /><span className="mt-2 block text-sm font-semibold text-stone-800">{label}</span>
+      <span className="mt-1 block break-words text-xs text-stone-500">{files.length ? files.map((file) => file.name).join(', ') : existing.length ? `Current: ${existing.join(', ')}` : 'Choose files'}</span>
+      <span className="mt-2 block text-[11px] text-stone-400">{hint}</span><FieldError message={error} />
+      <input type="file" required={required} multiple={multiple} accept={accept} onChange={(event) => onChange(Array.from(event.target.files ?? []))} className="sr-only" />
+    </label>
+  </div>
 );
 
 const VariantCard = ({ index, value, config, error, onChange, onRemove }: {
