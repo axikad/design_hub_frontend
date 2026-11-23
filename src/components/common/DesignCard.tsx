@@ -13,12 +13,6 @@ const formatInr = (value: number) => new Intl.NumberFormat('en-IN', {
   style: 'currency', currency: 'INR', maximumFractionDigits: 0,
 }).format(value);
 
-const SellerAvatar: React.FC<{ design: DesignCardData }> = ({ design }) => design.sellerAvatar ? (
-  <img src={design.sellerAvatar} alt="" loading="lazy" className="h-5 w-5 shrink-0 rounded-full object-cover" />
-) : (
-  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-100 text-[9px] font-bold uppercase text-amber-900">{design.sellerName.charAt(0)}</span>
-);
-
 export const DesignCard: React.FC<DesignCardProps> = ({ design, viewMode = 'grid' }) => {
   const { user, isSaved, toggleSaveDesign, isPurchased, showToast } = useApp();
   const saved = isSaved(design.id);
@@ -54,10 +48,7 @@ export const DesignCard: React.FC<DesignCardProps> = ({ design, viewMode = 'grid
             <span className="font-semibold text-amber-800">{design.category}</span><span>·</span><span>{design.machine}</span><span>·</span><span className="font-mono">{design.stitches.toLocaleString('en-IN')} stitches</span>
           </div>
           <Link to={`/design/${design.id}`} className="mt-1.5 block truncate font-serif text-base font-semibold text-stone-950 transition group-hover:text-amber-900">{design.title}</Link>
-          <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-stone-500">
-            {design.formats.length > 0 && <><span className="font-mono">{design.formats.slice(0, 4).join(' / ')}</span><span>·</span></>}
-            <span className="inline-flex min-w-0 items-center gap-1.5"><SellerAvatar design={design} /><span className="truncate">By {design.sellerName}</span></span>
-          </div>
+          {design.formats.length > 0 && <div className="mt-2 font-mono text-[11px] text-stone-500">{design.formats.slice(0, 4).join(' / ')}</div>}
         </div>
         <div className="flex items-center justify-between gap-3 border-t border-stone-100 pt-3 sm:flex-col sm:items-end sm:border-0 sm:pt-0">
           <div className="text-right"><p className="font-mono text-lg font-bold text-stone-950">{formatInr(design.price)}</p><p className="text-[10px] text-stone-400">Production file</p></div>
@@ -85,9 +76,8 @@ export const DesignCard: React.FC<DesignCardProps> = ({ design, viewMode = 'grid
         <div className="flex items-center gap-2 text-[10px] uppercase tracking-wider text-stone-500"><span className="truncate font-semibold text-amber-800">{design.category}</span><span>·</span><span className="truncate">{design.machine}</span></div>
         <Link to={`/design/${design.id}`} title={design.title} className="mt-1.5 block line-clamp-1 font-serif text-base font-semibold leading-5 text-stone-950 transition group-hover:text-amber-900">{design.title}</Link>
         <p className="mt-1.5 line-clamp-1 text-[11px] leading-4 text-stone-500">{design.description}</p>
-        <div className="mt-2.5 flex items-center justify-between gap-2 border-t border-stone-100 pt-2.5 text-[10px] text-stone-500">
-          <span className="inline-flex min-w-0 items-center gap-1.5"><SellerAvatar design={design} /><span className="truncate">{design.sellerName}</span></span>
-          <span className="shrink-0 font-mono text-[10px] text-stone-400">{design.formats.slice(0, 3).join(' · ') || 'FILE'}</span>
+        <div className="mt-2.5 flex justify-end border-t border-stone-100 pt-2.5 text-[10px] text-stone-500">
+          <span className="font-mono text-stone-400">{design.formats.slice(0, 3).join(' · ') || 'FILE'}</span>
         </div>
         <div className="mt-2.5 flex items-center justify-between gap-3 border-t border-stone-100 pt-2.5">
           <div className="min-w-0">
