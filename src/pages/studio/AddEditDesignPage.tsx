@@ -61,6 +61,7 @@ export const AddEditDesignPage: React.FC = () => {
   const [categoryId, setCategoryId] = useState('');
   const [title, setTitle] = useState('');
   const [variants, setVariants] = useState<VariantForm[]>([]);
+  const [activeVariantKey, setActiveVariantKey] = useState('');
   const [customType, setCustomType] = useState('');
   const [sequenceType, setSequenceType] = useState<VariantValue>('');
   const [designFileTypeId, setDesignFileTypeId] = useState('');
@@ -103,7 +104,7 @@ export const AddEditDesignPage: React.FC = () => {
         setPriceRupees(String((design?.pricePaise ?? 10000) / 100));
         setExistingImages(design?.images ?? []);
         setExistingFiles(design?.files ?? []);
-        setVariants((design?.designTypes ?? []).map((item, index) => ({
+        const loadedVariants = (design?.designTypes ?? []).map((item, index) => ({
           key: item.typeId ? `type:${item.typeId}` : `custom:${item.customTypeName || index}`,
           typeId: item.typeId,
           customTypeName: item.customTypeName || '',
@@ -117,7 +118,9 @@ export const AddEditDesignPage: React.FC = () => {
           imageFile: null,
           existingImage: item.details.image,
           removeImage: false,
-        })));
+        }));
+        setVariants(loadedVariants);
+        setActiveVariantKey(loadedVariants[0]?.key ?? '');
       } catch (error) {
         if (error instanceof DOMException && error.name === 'AbortError') return;
         showToast('Could not open design form', getErrorMessage(error), 'error');
@@ -183,6 +186,7 @@ export const AddEditDesignPage: React.FC = () => {
     setMachineTypeId('');
     setCategoryId('');
     setVariants([]);
+    setActiveVariantKey('');
     setDesignFileTypeId('');
     setFieldErrors({});
   };
@@ -190,23 +194,43 @@ export const AddEditDesignPage: React.FC = () => {
     setMachineTypeId(value);
     setCategoryId('');
     setVariants([]);
+    setActiveVariantKey('');
   };
   const selectCategory = (value: string) => {
     setCategoryId(value);
     setVariants([]);
+    setActiveVariantKey('');
   };
   const toggleType = (type: DesignOptionItem) => {
-    setVariants((current) => current.some((item) => item.typeId === type.id)
-      ? current.filter((item) => item.typeId !== type.id)
-      : [...current, emptyVariant(type)]);
+    const existing = variants.find((item) => item.typeId === type.id);
+    if (existing && activeVariantKey !== existing.key) {
+      setActiveVariantKey(existing.key);
+      return;
+    }
+    if (existing) {
+      const next = variants.filter((item) => item.key !== existing.key);
+      setVariants(next);
+      setActiveVariantKey(next[0]?.key ?? '');
+      return;
+    }
+    const nextVariant = emptyVariant(type);
+    setVariants((current) => [...current, nextVariant]);
+    setActiveVariantKey(nextVariant.key);
   };
   const addCustomType = () => {
     const value = customType.trim();
     if (!value) return;
     const key = `custom:${value.toLowerCase()}`;
     if (variants.some((item) => item.key === key)) return;
-    setVariants((current) => [...current, { ...emptyVariant({ id: key, name: value }), key, typeId: null, customTypeName: value }]);
+    const nextVariant = { ...emptyVariant({ id: key, name: value }), key, typeId: null, customTypeName: value };
+    setVariants((current) => [...current, nextVariant]);
+    setActiveVariantKey(nextVariant.key);
     setCustomType('');
+  };
+  const removeVariant = (key: string) => {
+    const next = variants.filter((item) => item.key !== key);
+    setVariants(next);
+    if (activeVariantKey === key) setActiveVariantKey(next[0]?.key ?? '');
   };
   const updateVariant = (index: number, patch: Partial<VariantForm>) => {
     setVariants((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, ...patch } : item));
@@ -273,6 +297,9 @@ export const AddEditDesignPage: React.FC = () => {
     } catch (error) {
       if (error instanceof ApiError) {
         setFieldErrors(error.errors ?? {});
+        const firstVariantError = Object.keys(error.errors ?? {}).find((key) => /^designTypes\.\d+\./.test(key));
+        const errorIndex = firstVariantError ? Number(firstVariantError.split('.')[1]) : -1;
+        if (errorIndex >= 0 && variants[errorIndex]) setActiveVariantKey(variants[errorIndex].key);
         const detail = error.errors ? Object.values(error.errors).flat()[0] : error.message;
         showToast('Design could not be saved', detail || error.message, 'error');
       } else {
@@ -308,14 +335,21 @@ export const AddEditDesignPage: React.FC = () => {
             {config.machineType && <label className="text-sm font-semibold text-stone-700">Machine type<select required={config.required.machineType} value={machineTypeId} onChange={(event) => selectMachineType(event.target.value)} className="mt-2 w-full rounded-xl border border-stone-300 bg-white px-3 py-3 font-normal outline-none focus:border-amber-700"><option value="">Select machine type</option>{machineTypes.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select><FieldError message={firstError('machineTypeId')} /></label>}
             {config.category && <label className="text-sm font-semibold text-stone-700">Category<select required={config.required.category} value={categoryId} onChange={(event) => selectCategory(event.target.value)} className="mt-2 w-full rounded-xl border border-stone-300 bg-white px-3 py-3 font-normal outline-none focus:border-amber-700"><option value="">Select category</option>{categories.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select><FieldError message={firstError('categoryId')} /></label>}
           </div>
-          {config.designTypes && <div className="mt-5"><p className="text-sm font-semibold text-stone-700">Design types</p><p className="mt-1 text-xs text-stone-500">Select every type included in this design.</p><div className="mt-3 flex flex-wrap gap-2">{designTypes.map((type) => <button key={type.id} type="button" onClick={() => toggleType(type)} className={`rounded-full border px-4 py-2 text-sm font-semibold transition ${variants.some((item) => item.typeId === type.id) ? 'border-stone-950 bg-stone-950 text-white' : 'border-stone-300 bg-white text-stone-700 hover:border-amber-700'}`}>{type.name}</button>)}</div>{variants.some((item) => !item.typeId) && <div className="mt-3 flex flex-wrap gap-2">{variants.filter((item) => !item.typeId).map((variant) => <button key={variant.key} type="button" title="Remove custom type" onClick={() => setVariants((current) => current.filter((item) => item.key !== variant.key))} className="rounded-full border border-amber-700 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-950">{variant.customTypeName} ×</button>)}</div>}<div className="mt-4 flex max-w-lg gap-2"><input value={customType} onChange={(event) => setCustomType(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); addCustomType(); } }} placeholder="Optional custom type" className="min-w-0 flex-1 rounded-xl border border-stone-300 px-3 py-2.5 text-sm outline-none focus:border-amber-700" /><button type="button" onClick={addCustomType} className="inline-flex items-center rounded-xl border border-stone-300 px-4 text-sm font-semibold hover:border-amber-700"><Plus className="mr-1 h-4 w-4" />Add custom</button></div><FieldError message={firstError('designTypes')} /></div>}
+          {config.designTypes && <div className="mt-5"><p className="text-sm font-semibold text-stone-700">Design types</p><p className="mt-1 text-xs text-stone-500">Select every type included in this design. Click a selected type to open its specifications.</p><div className="mt-3 flex flex-wrap gap-2">{designTypes.map((type) => {
+            const variant = variants.find((item) => item.typeId === type.id);
+            const active = variant?.key === activeVariantKey;
+            return <button key={type.id} type="button" onClick={() => toggleType(type)} className={`rounded-full border px-4 py-2 text-sm font-semibold transition ${active ? 'border-stone-950 bg-stone-950 text-white shadow-sm' : variant ? 'border-amber-700 bg-amber-50 text-amber-950' : 'border-stone-300 bg-white text-stone-700 hover:border-amber-700'}`}>{type.name}</button>;
+          })}</div>{variants.some((item) => !item.typeId) && <div className="mt-3 flex flex-wrap gap-2">{variants.filter((item) => !item.typeId).map((variant) => <button key={variant.key} type="button" onClick={() => activeVariantKey === variant.key ? removeVariant(variant.key) : setActiveVariantKey(variant.key)} className={`rounded-full border px-4 py-2 text-sm font-semibold transition ${activeVariantKey === variant.key ? 'border-stone-950 bg-stone-950 text-white shadow-sm' : 'border-amber-700 bg-amber-50 text-amber-950'}`}>{variant.customTypeName}</button>)}</div>}<div className="mt-4 flex max-w-lg gap-2"><input value={customType} onChange={(event) => setCustomType(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); addCustomType(); } }} placeholder="Optional custom type" className="min-w-0 flex-1 rounded-xl border border-stone-300 px-3 py-2.5 text-sm outline-none focus:border-amber-700" /><button type="button" onClick={addCustomType} className="inline-flex items-center rounded-xl border border-stone-300 px-4 text-sm font-semibold hover:border-amber-700"><Plus className="mr-1 h-4 w-4" />Add custom</button></div><FieldError message={firstError('designTypes')} /></div>}
         </FormPanel>
 
         {config.designSpecifications && variants.length > 0 && (
           <FormPanel title="Design type specifications" description="Enter specifications and one image for every catalog or custom design type." icon={Layers3}>
-            <div className="space-y-4">
-              {variants.map((variant, index) => <VariantCard key={variant.key} index={index} value={variant} config={config} error={firstError(`designTypes.${index}`)} onChange={(patch) => updateVariant(index, patch)} onRemove={() => setVariants((current) => current.filter((_, itemIndex) => itemIndex !== index))} />)}
-            </div>
+            <div className="mb-4 flex gap-2 overflow-x-auto border-b border-stone-200 pb-3">{variants.map((variant, index) => {
+              const active = variant.key === activeVariantKey;
+              const hasError = Boolean(firstError(`designTypes.${index}`));
+              return <button key={variant.key} type="button" onClick={() => setActiveVariantKey(variant.key)} className={`shrink-0 rounded-lg border px-4 py-2 text-sm font-semibold transition ${active ? 'border-stone-950 bg-stone-950 text-white' : hasError ? 'border-rose-300 bg-rose-50 text-rose-700' : 'border-stone-200 bg-white text-stone-600 hover:border-amber-600'}`}>{variant.typeName}{hasError ? ' · Error' : ''}</button>;
+            })}</div>
+            {variants.map((variant, index) => variant.key === activeVariantKey ? <VariantCard key={variant.key} index={index} value={variant} config={config} error={firstError(`designTypes.${index}`)} onChange={(patch) => updateVariant(index, patch)} onRemove={() => removeVariant(variant.key)} /> : null)}
           </FormPanel>
         )}
 
