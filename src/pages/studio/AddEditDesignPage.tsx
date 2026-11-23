@@ -208,9 +208,10 @@ export const AddEditDesignPage: React.FC = () => {
       return;
     }
     if (existing) {
+      const removedIndex = variants.findIndex((item) => item.key === existing.key);
       const next = variants.filter((item) => item.key !== existing.key);
       setVariants(next);
-      setActiveVariantKey(next[0]?.key ?? '');
+      setActiveVariantKey(next[Math.max(0, removedIndex - 1)]?.key ?? '');
       return;
     }
     const nextVariant = emptyVariant(type);
@@ -228,9 +229,10 @@ export const AddEditDesignPage: React.FC = () => {
     setCustomType('');
   };
   const removeVariant = (key: string) => {
+    const removedIndex = variants.findIndex((item) => item.key === key);
     const next = variants.filter((item) => item.key !== key);
     setVariants(next);
-    if (activeVariantKey === key) setActiveVariantKey(next[0]?.key ?? '');
+    if (activeVariantKey === key) setActiveVariantKey(next[Math.max(0, removedIndex - 1)]?.key ?? '');
   };
   const updateVariant = (index: number, patch: Partial<VariantForm>) => {
     setVariants((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, ...patch } : item));
