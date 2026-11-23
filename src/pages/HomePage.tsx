@@ -207,20 +207,17 @@ export const HomePage: React.FC = () => {
         </div>
       </section>
 
-      <section className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
-        <SectionHeading eyebrow="Garment and textile segments" title="Browse popular categories" link="/explore" linkLabel="Explore all categories" />
+      <section className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
+        <SectionHeading eyebrow="Garment and textile segments" title="Browse all categories" />
         {loading ? (
-          <div className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-4">{Array.from({ length: 8 }).map((_, index) => <div key={index} className="h-32 animate-pulse rounded-xl bg-stone-100" />)}</div>
+          <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">{Array.from({ length: 10 }).map((_, index) => <div key={index} className="h-16 animate-pulse rounded-xl bg-stone-100" />)}</div>
         ) : (filters?.categories ?? []).length > 0 ? (
-          <div className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-4">
-            {(filters?.categories ?? []).slice(0, 8).map((category) => (
-              <Link key={category.id} to={`/explore?category=${encodeURIComponent(category.id)}`} className="group rounded-xl border border-stone-200/90 bg-white p-4 transition hover:-translate-y-0.5 hover:border-stone-400 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-700 focus-visible:ring-offset-2">
-                <div className="mb-4 flex items-center justify-between">
-                  <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-50 font-serif text-sm font-bold text-amber-900">{category.name.charAt(0).toUpperCase()}</span>
-                  <ChevronRight className="h-4 w-4 text-stone-400 transition group-hover:translate-x-0.5 group-hover:text-amber-800" aria-hidden="true" />
-                </div>
-                <h3 className="font-serif text-base font-semibold text-stone-950 group-hover:text-amber-900">{category.name}</h3>
-                <p className="mt-1 text-xs text-stone-500">Explore matching designs</p>
+          <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+            {(filters?.categories ?? []).map((category) => (
+              <Link key={category.id} to={`/explore?category=${encodeURIComponent(category.id)}`} className="group flex min-h-16 items-center gap-3 rounded-xl border border-stone-200/90 bg-white px-3 py-2.5 transition hover:-translate-y-0.5 hover:border-amber-600/60 hover:bg-amber-50/40 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-700 focus-visible:ring-offset-2 sm:px-4">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-50 font-serif text-xs font-bold text-amber-900 transition group-hover:bg-amber-100">{category.name.charAt(0).toUpperCase()}</span>
+                <h3 className="min-w-0 flex-1 line-clamp-2 text-sm font-semibold leading-snug text-stone-900 group-hover:text-amber-950">{category.name}</h3>
+                <ChevronRight className="h-4 w-4 shrink-0 text-stone-400 transition group-hover:translate-x-0.5 group-hover:text-amber-800" aria-hidden="true" />
               </Link>
             ))}
           </div>
@@ -313,8 +310,8 @@ export const HomePage: React.FC = () => {
 const SectionHeading: React.FC<{
   eyebrow: string;
   title: string;
-  link: string;
-  linkLabel: string;
+  link?: string;
+  linkLabel?: string;
   compact?: boolean;
 }> = ({ eyebrow, title, link, linkLabel, compact = false }) => (
   <div className="flex items-end justify-between gap-4">
@@ -322,7 +319,7 @@ const SectionHeading: React.FC<{
       <p className="text-xs font-bold uppercase tracking-[0.18em] text-amber-800">{eyebrow}</p>
       <h2 className={`${compact ? 'mt-1 text-2xl' : 'mt-2 text-3xl'} font-serif font-semibold text-stone-950`}>{title}</h2>
     </div>
-    <Link to={link} className="hidden items-center gap-1 text-sm font-semibold text-stone-700 hover:text-amber-900 sm:inline-flex">{linkLabel} <ArrowRight className="h-4 w-4" /></Link>
+    {link && linkLabel ? <Link to={link} className="hidden items-center gap-1 text-sm font-semibold text-stone-700 hover:text-amber-900 sm:inline-flex">{linkLabel} <ArrowRight className="h-4 w-4" /></Link> : null}
   </div>
 );
 
