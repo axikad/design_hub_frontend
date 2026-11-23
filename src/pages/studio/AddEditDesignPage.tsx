@@ -344,11 +344,6 @@ export const AddEditDesignPage: React.FC = () => {
 
         {config.designSpecifications && variants.length > 0 && (
           <FormPanel title="Design type specifications" description="Enter specifications and one image for every catalog or custom design type." icon={Layers3}>
-            <div className="mb-4 flex gap-2 overflow-x-auto border-b border-stone-200 pb-3">{variants.map((variant, index) => {
-              const active = variant.key === activeVariantKey;
-              const hasError = Boolean(firstError(`designTypes.${index}`));
-              return <button key={variant.key} type="button" onClick={() => setActiveVariantKey(variant.key)} className={`shrink-0 rounded-lg border px-4 py-2 text-sm font-semibold transition ${active ? 'border-stone-950 bg-stone-950 text-white' : hasError ? 'border-rose-300 bg-rose-50 text-rose-700' : 'border-stone-200 bg-white text-stone-600 hover:border-amber-600'}`}>{variant.typeName}{hasError ? ' · Error' : ''}</button>;
-            })}</div>
             {variants.map((variant, index) => variant.key === activeVariantKey ? <VariantCard key={variant.key} index={index} value={variant} config={config} error={firstError(`designTypes.${index}`)} onChange={(patch) => updateVariant(index, patch)} onRemove={() => removeVariant(variant.key)} /> : null)}
           </FormPanel>
         )}
