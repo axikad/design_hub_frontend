@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, CalendarDays, FileArchive, Image as ImageIcon, Layers3, LoaderCircle, Plus, Save, Tag, Trash2, UploadCloud, UserRound } from 'lucide-react';
+import { ArrowLeft, FileArchive, Image as ImageIcon, Layers3, LoaderCircle, Plus, Save, Tag, Trash2, UploadCloud, UserRound } from 'lucide-react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { StudioNavigation } from '../../components/studio/StudioNavigation';
 import { useApp } from '../../context/AppContext';
@@ -25,11 +25,6 @@ interface VariantForm {
   removeImage: boolean;
 }
 
-const today = () => {
-  const value = new Date();
-  value.setMinutes(value.getMinutes() - value.getTimezoneOffset());
-  return value.toISOString().slice(0, 10);
-};
 const money = (paise: number) => `₹${(paise / 100).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
 const emptyVariant = (type: DesignOptionItem): VariantForm => ({
   key: `type:${type.id}`,
@@ -70,8 +65,6 @@ export const AddEditDesignPage: React.FC = () => {
   const [sequenceType, setSequenceType] = useState<VariantValue>('');
   const [designFileTypeId, setDesignFileTypeId] = useState('');
   const [priceRupees, setPriceRupees] = useState('100');
-  const [showPrice, setShowPrice] = useState(true);
-  const [publishDate, setPublishDate] = useState(today());
   const [previewFiles, setPreviewFiles] = useState<File[]>([]);
   const [stitchFiles, setStitchFiles] = useState<File[]>([]);
   const [existingImages, setExistingImages] = useState<ApiImage[]>([]);
@@ -108,8 +101,6 @@ export const AddEditDesignPage: React.FC = () => {
         setSequenceType(design?.sequenceType || '');
         setDesignFileTypeId(design?.designFileTypeId || '');
         setPriceRupees(String((design?.pricePaise ?? 10000) / 100));
-        setShowPrice(design?.showPrice ?? true);
-        setPublishDate(design?.publishDate || today());
         setExistingImages(design?.images ?? []);
         setExistingFiles(design?.files ?? []);
         setVariants((design?.designTypes ?? []).map((item, index) => ({
@@ -271,9 +262,8 @@ export const AddEditDesignPage: React.FC = () => {
       if (config.stitchFiles) payload.files = files;
       if (config.pricing) {
         payload.pricePaise = Math.round(Number(priceRupees || 0) * 100);
-        payload.showPrice = showPrice;
+        payload.showPrice = true;
       }
-      payload.publishDate = publishDate || null;
 
       const response = id
         ? await studioApi.updateDesign(id, payload)
@@ -336,16 +326,12 @@ export const AddEditDesignPage: React.FC = () => {
         {(config.pricing || config.designFileType) && (
           <FormPanel title="Pricing and format" description="Set the enabled marketplace pricing and format fields." icon={Tag}>
             <div className="grid gap-5 sm:grid-cols-2">
-              {config.pricing && <div><label className="text-sm font-semibold text-stone-700">Selling price (INR)<input type="number" min="1" step="0.01" required={config.required.pricing} value={priceRupees} onChange={(event) => setPriceRupees(event.target.value)} className="mt-2 w-full rounded-xl border border-stone-300 px-3 py-3 font-mono font-normal outline-none focus:border-amber-700" /><FieldError message={firstError('pricePaise')} /></label><label className="mt-3 flex items-center gap-3 rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm font-semibold text-stone-700"><input type="checkbox" checked={showPrice} onChange={(event) => setShowPrice(event.target.checked)} className="h-4 w-4 accent-stone-950" />Show price in marketplace</label></div>}
+              {config.pricing && <div><label className="text-sm font-semibold text-stone-700">Selling price (INR)<input type="number" min="1" step="0.01" required={config.required.pricing} value={priceRupees} onChange={(event) => setPriceRupees(event.target.value)} className="mt-2 w-full rounded-xl border border-stone-300 px-3 py-3 font-mono font-normal outline-none focus:border-amber-700" /><FieldError message={firstError('pricePaise')} /></label></div>}
               {config.designFileType && <label className="text-sm font-semibold text-stone-700">Design file type<select required={config.required.designFileType} value={designFileTypeId} onChange={(event) => setDesignFileTypeId(event.target.value)} className="mt-2 w-full rounded-xl border border-stone-300 bg-white px-3 py-3 font-normal outline-none focus:border-amber-700"><option value="">Select file type</option>{fileTypes.map((item) => <option key={item.id} value={item.id}>{item.name}{item.extension ? ` (.${item.extension})` : ''}</option>)}</select><FieldError message={firstError('designFileTypeId')} />{!fileTypes.length && <span className="mt-2 block text-xs font-normal text-amber-700">No active file type is connected to this machine.</span>}</label>}
             </div>
             {pricing && <div className="mt-5 grid gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm sm:grid-cols-3"><div><span className="text-stone-500">Selling price</span><strong className="mt-1 block font-mono">{money(pricing.itemPricePaise)}</strong></div><div><span className="text-stone-500">Platform commission ({pricing.platformCommission.percent}%)</span><strong className="mt-1 block font-mono text-rose-700">−{money(pricing.platformCommission.amountPaise)}</strong></div><div><span className="text-stone-500">Estimated earning</span><strong className="mt-1 block font-mono text-emerald-700">{money(pricing.estimatedSellerEarningPaise)}</strong></div><p className="sm:col-span-3 text-xs text-amber-950">{pricing.notice}</p></div>}
           </FormPanel>
         )}
-
-        <FormPanel title="Publishing" description="Choose when this design appears in the marketplace." icon={CalendarDays}>
-          <label className="block max-w-xs text-sm font-semibold text-stone-700">Publish date<input type="date" value={publishDate} onChange={(event) => setPublishDate(event.target.value)} className="mt-2 w-full rounded-xl border border-stone-300 px-3 py-3 font-normal outline-none focus:border-amber-700" /><FieldError message={firstError('publishDate')} /></label>
-        </FormPanel>
 
         {(config.previewImages || config.stitchFiles) && <div className="grid gap-5 lg:grid-cols-2">
           {config.previewImages && <FormPanel title="Preview images" description={isEdit ? 'Select new images only when you want to replace all current preview images.' : 'Upload marketplace preview images.'} icon={ImageIcon}><UploadField label="Choose preview images" required={config.required.previewImages && existingImages.length === 0} multiple accept="image/*" files={previewFiles} existing={existingImages.map((item) => item.name)} existingPreviews={existingImages.map((item) => ({ name: item.name, src: normalizeAssetUrl(item.thumbnailUri || item.uri) })).filter((item): item is { name: string; src: string } => Boolean(item.src))} onChange={setPreviewFiles} hint={previewFiles.length ? 'New images will replace the current preview set.' : 'Marketplace images shown before purchase.'} error={firstError('images') || firstError('imageUri')} /></FormPanel>}
