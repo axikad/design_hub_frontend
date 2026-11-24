@@ -6,6 +6,7 @@ import {
   Layers3,
   LoaderCircle,
   Plus,
+  ReceiptIndianRupee,
   Save,
   Tag,
   Trash2,
@@ -88,7 +89,7 @@ export const AddEditDesignPage: React.FC = () => {
   const [customType, setCustomType] = useState("");
   const [sequenceType, setSequenceType] = useState<VariantValue>("");
   const [designFileTypeId, setDesignFileTypeId] = useState("");
-  const [priceRupees, setPriceRupees] = useState("100");
+  const [priceRupees, setPriceRupees] = useState("");
   const [previewFiles, setPreviewFiles] = useState<File[]>([]);
   const [stitchFiles, setStitchFiles] = useState<File[]>([]);
   const [existingImages, setExistingImages] = useState<ApiImage[]>([]);
@@ -135,7 +136,7 @@ export const AddEditDesignPage: React.FC = () => {
         setTitle(design?.title || "");
         setSequenceType(design?.sequenceType || "");
         setDesignFileTypeId(design?.designFileTypeId || "");
-        setPriceRupees(String((design?.pricePaise ?? 10000) / 100));
+        setPriceRupees(design?.pricePaise != null ? String(design.pricePaise / 100) : "");
         setExistingImages(design?.images ?? []);
         setExistingFiles(design?.files ?? []);
         const loadedVariants = (design?.designTypes ?? []).map(
@@ -218,7 +219,8 @@ export const AddEditDesignPage: React.FC = () => {
   }, [machineId, showToast]);
 
   useEffect(() => {
-    if (!config?.pricing || Number(priceRupees) < 0) {
+    const numericPrice = Number(priceRupees);
+    if (!config?.pricing || priceRupees.trim() === "" || !Number.isFinite(numericPrice) || numericPrice <= 0) {
       setPricing(null);
       return;
     }
@@ -226,7 +228,7 @@ export const AddEditDesignPage: React.FC = () => {
     const timeout = window.setTimeout(() => {
       studioApi
         .pricingPreview(
-          Math.round(Number(priceRupees || 0) * 100),
+          Math.round(numericPrice * 100),
           controller.signal,
         )
         .then((response) => setPricing(response.data))
@@ -680,7 +682,7 @@ export const AddEditDesignPage: React.FC = () => {
             description="Set the enabled marketplace pricing and format fields."
             icon={Tag}
           >
-            <div className="grid gap-5 sm:grid-cols-2">
+            <div className="grid items-start gap-5 sm:grid-cols-2">
               {config.pricing && (
                 <div>
                   <label className="text-sm font-semibold text-stone-700">
@@ -696,79 +698,83 @@ export const AddEditDesignPage: React.FC = () => {
                     />
                     <FieldError message={firstError("pricePaise")} />
                   </label>
+                  {pricing && (
+                    <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50/70 p-4 text-sm">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2 font-bold text-stone-900">
+                          <ReceiptIndianRupee className="h-4 w-4 text-amber-700" />
+                          Estimated seller earnings
+                        </div>
+                        {pricing.isTestMode && (
+                          <span className="rounded-full bg-amber-100 px-2 py-1 text-[10px] font-bold tracking-wide text-amber-700 uppercase">Test mode</span>
+                        )}
+                      </div>
+                      <dl className="mt-4 space-y-2">
+                        <div className="flex items-center justify-between gap-3">
+                          <dt className="text-stone-500">Selling price</dt>
+                          <dd className="font-mono font-semibold">{money(pricing.itemPricePaise)}</dd>
+                        </div>
+                        {pricing.taxes.buyerGst.enabled && (
+                          <div className="flex items-center justify-between gap-3">
+                            <dt className="text-stone-500">GST charged to buyer ({pricing.taxes.buyerGst.percent}%)</dt>
+                            <dd className="font-mono font-semibold">+{money(pricing.taxes.buyerGst.amountPaise)}</dd>
+                          </div>
+                        )}
+                        <div className="flex items-center justify-between gap-3">
+                          <dt className="font-medium text-stone-700">Buyer will pay</dt>
+                          <dd className="font-mono font-semibold">{money(pricing.buyerPayablePaise)}</dd>
+                        </div>
+                        <div className="flex items-center justify-between gap-3">
+                          <dt className="text-stone-500">Platform commission ({pricing.platformCommission.percent}%)</dt>
+                          <dd className="font-mono font-semibold text-rose-700">-{money(pricing.platformCommission.amountPaise)}</dd>
+                        </div>
+                        {pricing.taxes.commissionGst.enabled && (
+                          <div className="flex items-center justify-between gap-3">
+                            <dt className="text-stone-500">GST on platform commission ({pricing.taxes.commissionGst.percent}%)</dt>
+                            <dd className="font-mono font-semibold text-rose-700">-{money(pricing.taxes.commissionGst.amountPaise)}</dd>
+                          </div>
+                        )}
+                        <div className="flex items-center justify-between gap-3">
+                          <dt className="text-stone-500">Seller earning before buyer GST</dt>
+                          <dd className="font-mono font-semibold">{money(pricing.sellerGrossPaise)}</dd>
+                        </div>
+                        <div className="flex items-center justify-between gap-3 border-t border-amber-200 pt-2">
+                          <dt className="font-bold text-stone-800">Estimated wallet credit</dt>
+                          <dd className="font-mono text-base font-bold text-emerald-700">{money(pricing.estimatedSellerEarningPaise)}</dd>
+                        </div>
+                      </dl>
+                      <p className="mt-2 text-[10px] leading-4 text-stone-500">
+                        Estimate only. Final amounts and tax details are saved when the buyer pays.
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
               {config.designFileType && (
-                <label className="text-sm font-semibold text-stone-700">
-                  Design file type {config.required.designFileType && <RequiredMark />}
-                  <select
-                    required={config.required.designFileType}
-                    value={designFileTypeId}
-                    onChange={(event) =>
-                      setDesignFileTypeId(event.target.value)
-                    }
-                    className="mt-2 w-full rounded-xl border border-stone-300 bg-white px-3 py-3 font-normal outline-none focus:border-amber-700"
-                  >
-                    <option value="">Select file type</option>
-                    {fileTypes.map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {item.name}
-                        {item.extension ? ` (.${item.extension})` : ""}
-                      </option>
-                    ))}
-                  </select>
-                  <FieldError message={firstError("designFileTypeId")} />
-                  {!fileTypes.length && (
-                    <span className="mt-2 block text-xs font-normal text-amber-700">
-                      No active file type is connected to this machine.
-                    </span>
-                  )}
-                </label>
+                <div className="self-start">
+                  <label className="text-sm font-semibold text-stone-700">
+                    Design file type {config.required.designFileType && <RequiredMark />}
+                    <select
+                      required={config.required.designFileType}
+                      value={designFileTypeId}
+                      onChange={(event) => setDesignFileTypeId(event.target.value)}
+                      className="mt-2 w-full rounded-xl border border-stone-300 bg-white px-3 py-3 font-normal outline-none focus:border-amber-700"
+                    >
+                      <option value="">Select file type</option>
+                      {fileTypes.map((item) => (
+                        <option key={item.id} value={item.id}>
+                          {item.name}{item.extension ? ` (.${item.extension})` : ""}
+                        </option>
+                      ))}
+                    </select>
+                    <FieldError message={firstError("designFileTypeId")} />
+                    {!fileTypes.length && (
+                      <span className="mt-2 block text-xs font-normal text-amber-700">No active file type is connected to this machine.</span>
+                    )}
+                  </label>
+                </div>
               )}
             </div>
-            {pricing && (
-              <div className="mt-5 grid gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm sm:grid-cols-2 lg:grid-cols-3">
-                <div>
-                  <span className="text-stone-500">Selling price</span>
-                  <strong className="mt-1 block font-mono">
-                    {money(pricing.itemPricePaise)}
-                  </strong>
-                </div>
-                {pricing.taxes.buyerGst.enabled && <div>
-                  <span className="text-stone-500">GST charged to buyer ({pricing.taxes.buyerGst.percent}%)</span>
-                  <strong className="mt-1 block font-mono text-stone-900">+{money(pricing.taxes.buyerGst.amountPaise)}</strong>
-                </div>}
-                <div>
-                  <span className="text-stone-500">Buyer will pay</span>
-                  <strong className="mt-1 block font-mono">{money(pricing.buyerPayablePaise)}</strong>
-                </div>
-                <div>
-                  <span className="text-stone-500">
-                    Platform commission ({pricing.platformCommission.percent}%)
-                  </span>
-                  <strong className="mt-1 block font-mono text-rose-700">
-                    −{money(pricing.platformCommission.amountPaise)}
-                  </strong>
-                </div>
-                {pricing.taxes.commissionGst.enabled && <div>
-                  <span className="text-stone-500">GST on platform commission ({pricing.taxes.commissionGst.percent}%)</span>
-                  <strong className="mt-1 block font-mono text-rose-700">-{money(pricing.taxes.commissionGst.amountPaise)}</strong>
-                </div>}
-                <div>
-                  <span className="text-stone-500">Seller earning before buyer GST</span>
-                  <strong className="mt-1 block font-mono">{money(pricing.sellerGrossPaise)}</strong>
-                </div>
-                <div>
-                  <span className="text-stone-500">Estimated wallet credit</span>
-                  <strong className="mt-1 block font-mono text-emerald-700">
-                    {money(pricing.estimatedSellerEarningPaise)}
-                  </strong>
-                </div>
-                <p className="sm:col-span-3 text-xs text-amber-950">
-                  {pricing.notice}
-                </p>
-              </div>
-            )}
           </FormPanel>
         )}
 
