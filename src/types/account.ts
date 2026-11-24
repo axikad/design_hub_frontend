@@ -31,6 +31,12 @@ export interface ApiUser {
     password: boolean;
   };
   sellerSettlementMode: 'manual' | 'automatic';
+  taxProfile: {
+    country: 'IN';
+    stateCode: string | null;
+    gstRegistered: boolean;
+    gstin: string | null;
+  };
 }
 
 export interface AuthPayload {

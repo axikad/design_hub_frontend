@@ -32,6 +32,9 @@ export interface UserProfile {
   gstNumber: string;
   location: string;
   permissions: string[];
+  taxStateCode: string;
+  gstRegistered: boolean;
+  gstNumber: string;
 }
 
 interface AppContextType {
@@ -62,7 +65,7 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 const emptyUser: UserProfile = {
   id: '', name: '', email: '', phone: '', countryCode: '+91', avatar: '', role: 'buyer',
   machinePreferences: [], settlementMode: 'manual', isLoggedIn: false, bankAccount: '',
-  companyName: '', gstNumber: '', location: '', permissions: [],
+  companyName: '', gstNumber: '', location: '', permissions: [], taxStateCode: '', gstRegistered: false,
 };
 
 const canUseSellerTools = (user: ApiUser) =>
@@ -82,6 +85,9 @@ const mapUser = (user: ApiUser): UserProfile => ({
   settlementMode: user.sellerSettlementMode ?? 'manual',
   isLoggedIn: true,
   permissions: user.permissions,
+  taxStateCode: user.taxProfile?.stateCode ?? '',
+  gstRegistered: user.taxProfile?.gstRegistered ?? false,
+  gstNumber: user.taxProfile?.gstin ?? '',
 });
 
 const mapPurchase = (purchase: ApiPurchase): PurchaseRecord => ({

@@ -196,7 +196,8 @@ export const authApi = {
 };
 
 export const accountApi = {
-  updateProfile: (name: string) => apiRequest<ApiEnvelope<ApiUser>>('users/me', { method: 'PATCH', body: { name }, authenticated: true }),
+  updateProfile: (payload: { name: string; taxStateCode?: string | null; gstRegistered?: boolean; gstin?: string | null }) =>
+    apiRequest<ApiEnvelope<ApiUser>>('users/me', { method: 'PATCH', body: payload, authenticated: true }),
   machines: (signal?: AbortSignal) => apiRequest<ApiEnvelope<MachinePreferencePayload>>('users/me/machines', { signal, authenticated: true }),
   updateMachines: (machineIds: string[]) => apiRequest<ApiEnvelope<MachinePreferencePayload>>('users/me/machines', { method: 'PUT', body: { machineIds }, authenticated: true }),
   savedDesigns: (query: Query = {}, signal?: AbortSignal) => apiRequest<SavedDesignEnvelope>('users/me/saved-designs', { query, signal, authenticated: true }),
@@ -210,10 +211,10 @@ const itemPayload = (type: CheckoutItemType, id: string) =>
   type === 'design' ? { designId: id } : { folderId: id };
 
 export const commerceApi = {
-  checkoutPreview: (type: CheckoutItemType, id: string, signal?: AbortSignal) =>
-    apiRequest<ApiEnvelope<CheckoutPreview>>('payments/checkout-preview', { query: itemPayload(type, id), signal, authenticated: true }),
-  createOrder: (type: CheckoutItemType, id: string) =>
-    apiRequest<ApiEnvelope<CheckoutOrder>>('payments/orders', { method: 'POST', body: itemPayload(type, id), authenticated: true }),
+  checkoutPreview: (type: CheckoutItemType, id: string, buyerStateCode?: string, signal?: AbortSignal) =>
+    apiRequest<ApiEnvelope<CheckoutPreview>>('payments/checkout-preview', { query: { ...itemPayload(type, id), ...(buyerStateCode ? { buyerStateCode } : {}) }, signal, authenticated: true }),
+  createOrder: (type: CheckoutItemType, id: string, buyerStateCode?: string) =>
+    apiRequest<ApiEnvelope<CheckoutOrder>>('payments/orders', { method: 'POST', body: { ...itemPayload(type, id), ...(buyerStateCode ? { buyerStateCode } : {}) }, authenticated: true }),
   verify: (type: CheckoutItemType, id: string, verification: PaymentVerification) =>
     apiRequest<ApiEnvelope<PurchaseStatus>>('payments/verify', { method: 'POST', body: { ...itemPayload(type, id), ...verification }, authenticated: true }),
   purchaseStatus: (type: CheckoutItemType, id: string, signal?: AbortSignal) =>

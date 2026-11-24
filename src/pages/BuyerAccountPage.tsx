@@ -6,6 +6,7 @@ import { DesignCard } from '../components/common/DesignCard';
 import { EmptyState } from '../components/common/EmptyState';
 import { LoadingSkeleton } from '../components/common/LoadingSkeleton';
 import { useApp } from '../context/AppContext';
+import { indiaGstStates } from '../data/indiaGstStates';
 import { accountApi, ApiError } from '../lib/api-client';
 import { toDesignCard } from '../lib/marketplace-mappers';
 import type { ApiDesign } from '../types/marketplace';
@@ -20,6 +21,9 @@ export const BuyerAccountPage: React.FC = () => {
   const requestedTab = searchParams.get('tab');
   const activeTab: Tab = requestedTab === 'saved' || requestedTab === 'machines' || requestedTab === 'security' ? requestedTab : 'profile';
   const [name, setName] = useState(user.name);
+  const [taxStateCode, setTaxStateCode] = useState(user.taxStateCode);
+  const [gstRegistered, setGstRegistered] = useState(user.gstRegistered);
+  const [gstin, setGstin] = useState(user.gstNumber);
   const [saved, setSaved] = useState<ApiDesign[]>([]);
   const [machineData, setMachineData] = useState<MachinePreferencePayload | null>(null);
   const [selectedMachineIds, setSelectedMachineIds] = useState<string[]>([]);
@@ -28,7 +32,12 @@ export const BuyerAccountPage: React.FC = () => {
   const [error, setError] = useState('');
   const [deleteOpen, setDeleteOpen] = useState(false);
 
-  useEffect(() => setName(user.name), [user.name]);
+  useEffect(() => {
+    setName(user.name);
+    setTaxStateCode(user.taxStateCode);
+    setGstRegistered(user.gstRegistered);
+    setGstin(user.gstNumber);
+  }, [user.gstNumber, user.gstRegistered, user.name, user.taxStateCode]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -54,7 +63,12 @@ export const BuyerAccountPage: React.FC = () => {
     event.preventDefault();
     setSaving(true);
     try {
-      await accountApi.updateProfile(name.trim());
+      await accountApi.updateProfile({
+        name: name.trim(),
+        taxStateCode: taxStateCode || null,
+        gstRegistered,
+        gstin: gstRegistered ? gstin.trim().toUpperCase() : null,
+      });
       await refreshUser();
       showToast('Profile updated', 'Your account name has been saved.', 'success');
     } catch (requestError) {
@@ -110,7 +124,7 @@ export const BuyerAccountPage: React.FC = () => {
         <section className="min-w-0 rounded-2xl border border-stone-200 bg-white p-5 shadow-sm sm:p-7">
           {error && <div className="mb-6 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">{error}</div>}
           {loading ? <LoadingSkeleton count={3} /> : activeTab === 'profile' ? (
-            <form onSubmit={saveProfile} className="max-w-2xl space-y-6"><div><h2 className="font-serif text-2xl font-semibold text-stone-950">Profile details</h2><p className="mt-1 text-sm text-stone-500">Your verified mobile and email cannot be changed without contact verification.</p></div><label className="block text-sm font-semibold text-stone-700">Name<input value={name} onChange={(event) => setName(event.target.value)} className="mt-2 w-full rounded-xl border border-stone-300 bg-stone-50 px-4 py-3 text-sm outline-none focus:border-amber-700" /></label><div className="grid gap-4 sm:grid-cols-2"><ReadOnly label="Verified mobile" value={`${user.countryCode} ${user.phone}`} /><ReadOnly label="Email" value={user.email || 'Not added'} /></div><button disabled={saving || !name.trim()} className="inline-flex items-center gap-2 rounded-xl bg-stone-950 px-5 py-3 text-sm font-semibold text-white disabled:opacity-50">{saving && <Loader2 className="h-4 w-4 animate-spin" />}Save profile</button></form>
+            <form onSubmit={saveProfile} className="max-w-2xl space-y-6"><div><h2 className="font-serif text-2xl font-semibold text-stone-950">Profile details</h2><p className="mt-1 text-sm text-stone-500">Your verified mobile and email cannot be changed without contact verification.</p></div><label className="block text-sm font-semibold text-stone-700">Name<input value={name} onChange={(event) => setName(event.target.value)} className="mt-2 w-full rounded-xl border border-stone-300 bg-stone-50 px-4 py-3 text-sm outline-none focus:border-amber-700" /></label><div className="grid gap-4 sm:grid-cols-2"><ReadOnly label="Verified mobile" value={`${user.countryCode} ${user.phone}`} /><ReadOnly label="Email" value={user.email || 'Not added'} /></div><div className="rounded-xl border border-stone-200 bg-stone-50 p-5"><h3 className="font-serif text-lg font-semibold text-stone-950">India GST profile</h3><p className="mt-1 text-xs leading-5 text-stone-500">Your billing state calculates CGST + SGST or IGST. Sellers should enable GST registration only when they have a valid GSTIN.</p><label className="mt-4 block text-sm font-semibold text-stone-700">State or union territory<select value={taxStateCode} onChange={(event) => setTaxStateCode(event.target.value)} className="mt-2 w-full rounded-xl border border-stone-300 bg-white px-3 py-3 text-sm font-normal outline-none focus:border-amber-700"><option value="">Select state</option>{indiaGstStates.map(([code, stateName]) => <option key={code} value={code}>{stateName} ({code})</option>)}</select></label>{user.role === 'seller' && <><label className="mt-4 flex items-start gap-3 text-sm text-stone-700"><input type="checkbox" checked={gstRegistered} onChange={(event) => setGstRegistered(event.target.checked)} className="mt-0.5 h-4 w-4" /><span><strong className="block text-stone-900">I am GST registered</strong>Buyer GST will be charged on my taxable listings.</span></label>{gstRegistered && <label className="mt-4 block text-sm font-semibold text-stone-700">GSTIN<input value={gstin} onChange={(event) => setGstin(event.target.value.toUpperCase())} maxLength={15} placeholder="24AAAAA0000A1Z5" className="mt-2 w-full rounded-xl border border-stone-300 bg-white px-4 py-3 font-mono text-sm uppercase outline-none focus:border-amber-700" /></label>}</>}</div><button disabled={saving || !name.trim() || !taxStateCode || (gstRegistered && gstin.trim().length !== 15)} className="inline-flex items-center gap-2 rounded-xl bg-stone-950 px-5 py-3 text-sm font-semibold text-white disabled:opacity-50">{saving && <Loader2 className="h-4 w-4 animate-spin" />}Save profile</button></form>
           ) : activeTab === 'saved' ? (
             <div><h2 className="font-serif text-2xl font-semibold text-stone-950">Saved designs</h2><p className="mt-1 text-sm text-stone-500">Your saved list is synchronized with the server.</p>{saved.length === 0 ? <div className="mt-6"><EmptyState icon={Heart} title="No saved designs" description="Save a design from the marketplace to find it here." actionLabel="Explore designs" onAction={() => navigate('/explore')} /></div> : <div className="mt-6 grid gap-5 sm:grid-cols-2 xl:grid-cols-3">{saved.map((design) => <DesignCard key={design.id} design={toDesignCard(design)} />)}</div>}</div>
           ) : activeTab === 'machines' ? (

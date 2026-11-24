@@ -42,9 +42,22 @@ export interface SellerEarning {
   item: { type: string; id: string; name: string };
   currency: string;
   buyerPaidPaise: number;
+  taxableAmountPaise: number;
+  buyerGst: {
+    basisPoints: number;
+    percent: number;
+    amountPaise: number;
+    supplyType: 'none' | 'intra_state' | 'inter_state';
+    cgstPaise: number;
+    sgstPaise: number;
+    igstPaise: number;
+    sellerStateCode: string | null;
+    buyerStateCode: string | null;
+  };
   commissionBasisPoints: number;
   commissionPercent: number;
   commissionPaise: number;
+  commissionGst: { basisPoints: number; percent: number; amountPaise: number };
   sellerGrossPaise: number;
   deductionsPaise: number;
   sellerNetPaise: number;

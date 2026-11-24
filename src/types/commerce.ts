@@ -1,8 +1,11 @@
 export type CheckoutItemType = 'design' | 'folder';
 
 export interface CheckoutTaxLine {
+  type?: 'cgst' | 'sgst' | 'igst';
   name?: string;
   label?: string;
+  basisPoints?: number;
+  percent?: number;
   amountPaise: number;
   [key: string]: unknown;
 }
@@ -19,6 +22,11 @@ export interface CheckoutPreview {
   itemPricePaise: number;
   taxes: {
     enabled: boolean;
+    supplyType: 'none' | 'intra_state' | 'inter_state';
+    sellerStateCode: string | null;
+    sellerStateName: string | null;
+    buyerStateCode: string | null;
+    buyerStateName: string | null;
     totalPaise: number;
     lines: CheckoutTaxLine[];
   };
@@ -39,6 +47,7 @@ export interface CheckoutOrder {
   currency: string;
   environment: string;
   isRealMoney: boolean;
+  buyerStateCode?: string | null;
   checkoutBreakdown: CheckoutPreview;
 }
 

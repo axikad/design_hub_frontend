@@ -71,6 +71,12 @@ export interface PricingPreview {
   sellerGrossPaise: number;
   sellerDeductionsPaise: number;
   estimatedSellerEarningPaise: number;
+  taxes: {
+    buyerGst: { enabled: boolean; basisPoints: number; percent: number; amountPaise: number; note: string | null };
+    commissionGst: { enabled: boolean; basisPoints: number; percent: number; amountPaise: number };
+    tds: { enabled: boolean; amountPaise: number };
+    gstTcs: { enabled: boolean; amountPaise: number };
+  };
   notice: string;
 }
 
