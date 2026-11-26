@@ -4,7 +4,7 @@ import { commerceApi, getErrorMessage } from '../../lib/api-client';
 import { useApp } from '../../context/AppContext';
 
 interface Props {
-  type: 'design' | 'folder';
+  type: 'design' | 'folder' | 'catalog';
   id: string;
   imageIndex?: number;
   label?: string;
@@ -31,6 +31,9 @@ export const ProtectedDownloadButton: React.FC<Props> = ({ type, id, imageIndex,
     try {
       if (type === 'folder') {
         const response = await commerceApi.downloadFolder(id);
+        startDownload(response.data.downloadUri);
+      } else if (type === 'catalog') {
+        const response = await commerceApi.downloadCatalog(id);
         startDownload(response.data.downloadUri);
       } else {
         const response = imageIndex === undefined

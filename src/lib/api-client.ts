@@ -21,16 +21,19 @@ import type {
   CheckoutOrder,
   CheckoutPreview,
   DesignDownloadGrant,
+  CatalogDownloadGrant,
   FolderDownloadGrant,
   PaymentVerification,
   PurchaseStatus,
 } from '../types/commerce';
 import type {
   DesignEnvelope,
+  CatalogEnvelope,
   DesignOptionItem,
   DesignOptions,
   FolderEnvelope,
   MyDesignsEnvelope,
+  MyCatalogsEnvelope,
   MyFoldersEnvelope,
   PricingPreview,
   UploadResult,
@@ -171,6 +174,10 @@ export const marketplaceApi = {
     apiGet<PaginatedEnvelope<ApiFolder[]>>('folders', query, signal),
   folder: (id: string, query: Query, signal?: AbortSignal) =>
     apiGet<PaginatedEnvelope<ApiFolder>>(`folders/${encodeURIComponent(id)}`, query, signal),
+  catalogs: (query: Query, signal?: AbortSignal) =>
+    apiGet<PaginatedEnvelope<ApiFolder[]>>('catalogs', query, signal),
+  catalog: (id: string, query: Query, signal?: AbortSignal) =>
+    apiGet<PaginatedEnvelope<ApiFolder>>(`catalogs/${encodeURIComponent(id)}`, query, signal),
   searchByImage: (image: File, signal?: AbortSignal) => {
     const body = new FormData();
     body.append('image', image);
@@ -207,8 +214,14 @@ export const accountApi = {
   deleteAccount: () => apiRequest<ApiEnvelope<{ message: string }>>('users/me', { method: 'DELETE', body: { confirmation: 'DELETE' }, authenticated: true }),
 };
 
-const itemPayload = (type: CheckoutItemType, id: string) =>
-  type === 'design' ? { designId: id } : { folderId: id };
+const itemPayload = (type: CheckoutItemType, id: string) => {
+  if (type === 'design') return { designId: id };
+  if (type === 'folder') return { folderId: id };
+  return { catalogId: id };
+};
+
+const purchasePath = (type: CheckoutItemType) =>
+  type === 'design' ? 'designs' : type === 'folder' ? 'folders' : 'catalogs';
 
 export const commerceApi = {
   checkoutPreview: (type: CheckoutItemType, id: string, buyerStateCode?: string, signal?: AbortSignal) =>
@@ -218,13 +231,15 @@ export const commerceApi = {
   verify: (type: CheckoutItemType, id: string, verification: PaymentVerification) =>
     apiRequest<ApiEnvelope<PurchaseStatus>>('payments/verify', { method: 'POST', body: { ...itemPayload(type, id), ...verification }, authenticated: true }),
   purchaseStatus: (type: CheckoutItemType, id: string, signal?: AbortSignal) =>
-    apiRequest<ApiEnvelope<PurchaseStatus>>(`purchases/${type === 'design' ? 'designs' : 'folders'}/${encodeURIComponent(id)}`, { signal, authenticated: true }),
+    apiRequest<ApiEnvelope<PurchaseStatus>>(`purchases/${purchasePath(type)}/${encodeURIComponent(id)}`, { signal, authenticated: true }),
   downloadDesign: (id: string, file = 0) =>
     apiRequest<ApiEnvelope<DesignDownloadGrant>>(`designs/${encodeURIComponent(id)}/download`, { method: 'POST', body: { file }, authenticated: true }),
   downloadDesignImage: (id: string, imageIndex: number) =>
     apiRequest<ApiEnvelope<DesignDownloadGrant>>(`designs/${encodeURIComponent(id)}/images/${imageIndex}/download`, { method: 'POST', authenticated: true }),
   downloadFolder: (id: string) =>
     apiRequest<ApiEnvelope<FolderDownloadGrant>>(`folders/${encodeURIComponent(id)}/download`, { method: 'POST', authenticated: true }),
+  downloadCatalog: (id: string) =>
+    apiRequest<ApiEnvelope<CatalogDownloadGrant>>(`catalogs/${encodeURIComponent(id)}/download`, { method: 'POST', authenticated: true }),
 };
 
 export const studioApi = {
@@ -259,6 +274,15 @@ export const studioApi = {
     body.append('pricePaise', String(pricePaise));
     body.append('file', file);
     return apiRequest<FolderEnvelope>('folders', { method: 'POST', body, authenticated: true });
+  },
+  myCatalogs: (query: Query = {}, signal?: AbortSignal) =>
+    apiRequest<MyCatalogsEnvelope>('users/me/catalogs', { query, signal, authenticated: true }),
+  createCatalog: (name: string, pricePaise: number, file: File) => {
+    const body = new FormData();
+    body.append('name', name);
+    body.append('pricePaise', String(pricePaise));
+    body.append('file', file);
+    return apiRequest<CatalogEnvelope>('catalogs', { method: 'POST', body, authenticated: true });
   },
 };
 

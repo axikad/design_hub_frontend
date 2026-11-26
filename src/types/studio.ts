@@ -84,4 +84,6 @@ export type MyDesignsEnvelope = PaginatedEnvelope<ApiDesign[]>;
 export type MyFoldersEnvelope = PaginatedEnvelope<ApiFolder[]>;
 export type DesignEnvelope = ApiEnvelope<ApiDesign>;
 export type FolderEnvelope = ApiEnvelope<ApiFolder>;
+export type MyCatalogsEnvelope = PaginatedEnvelope<ApiFolder[]>;
+export type CatalogEnvelope = ApiEnvelope<ApiFolder>;
 

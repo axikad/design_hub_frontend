@@ -28,6 +28,7 @@ export const HomePage: React.FC = () => {
   const [home, setHome] = useState<ApiHomeData | null>(null);
   const [filters, setFilters] = useState<BrowseFilters | null>(null);
   const [folders, setFolders] = useState<ApiFolder[]>([]);
+  const [catalogs, setCatalogs] = useState<ApiFolder[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [imageSearchOpen, setImageSearchOpen] = useState(false);
@@ -43,11 +44,13 @@ export const HomePage: React.FC = () => {
       marketplaceApi.home(controller.signal),
       marketplaceApi.browseFilters(controller.signal),
       marketplaceApi.folders({ page: 1, per_page: 3 }, controller.signal),
+      marketplaceApi.catalogs({ page: 1, per_page: 3 }, controller.signal),
     ])
-      .then(([homeResponse, filterResponse, folderResponse]) => {
+      .then(([homeResponse, filterResponse, folderResponse, catalogResponse]) => {
         setHome(homeResponse.data);
         setFilters(filterResponse.data);
         setFolders(folderResponse.data);
+        setCatalogs(catalogResponse.data);
       })
       .catch((requestError) => {
         if (requestError instanceof DOMException && requestError.name === 'AbortError') return;
@@ -84,6 +87,7 @@ export const HomePage: React.FC = () => {
     [home, filters],
   );
   const folderCards = useMemo(() => folders.map(toFolderCard), [folders]);
+  const catalogCards = useMemo(() => catalogs.map(toFolderCard), [catalogs]);
   const heroDesign = latestDesigns[0] ?? null;
 
   const submitSearch = (event: React.FormEvent) => {
@@ -263,6 +267,16 @@ export const HomePage: React.FC = () => {
               <SectionHeading eyebrow="Design folders" title="Browse grouped design files" link="/collections" linkLabel="View all folders" />
               <p className="mt-2 max-w-2xl text-sm text-stone-500">Explore purchasable design archives with file previews and server-provided pricing.</p>
               {loading ? <div className="mt-8"><LoadingSkeleton count={3} /></div> : <div className="mt-8 grid gap-6 md:grid-cols-3">{folderCards.map((folder) => <CollectionCard key={folder.id} collection={folder} />)}</div>}
+            </div>
+          </section>
+        )}
+
+        {(loading || catalogCards.length > 0) && (
+          <section className="border-b border-stone-200 bg-white py-16">
+            <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+              <SectionHeading eyebrow="Catalog packages" title="Browse complete textile catalogs" link="/catalogs" linkLabel="View all catalogs" />
+              <p className="mt-2 max-w-2xl text-sm text-stone-500">Explore independent purchasable catalogs with paginated file previews and protected archive downloads.</p>
+              {loading ? <div className="mt-8"><LoadingSkeleton count={3} /></div> : <div className="mt-8 grid gap-6 md:grid-cols-3">{catalogCards.map((catalog) => <CollectionCard key={catalog.id} collection={catalog} basePath="/catalogs" itemLabel="catalog" />)}</div>}
             </div>
           </section>
         )}

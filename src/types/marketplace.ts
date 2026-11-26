@@ -123,6 +123,9 @@ export interface ApiFolder {
   updatedAt: string | null;
 }
 
+export type ApiCatalogFile = ApiFolderFile;
+export type ApiCatalog = ApiFolder;
+
 export interface BrowseMachineType {
   id: string;
   name: string;

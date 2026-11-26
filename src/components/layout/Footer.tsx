@@ -18,7 +18,7 @@ export const Footer: React.FC = () => (
 
       <div>
         <h2 className="text-xs font-bold uppercase tracking-[0.18em] text-amber-300">Marketplace</h2>
-        <nav className="mt-4 flex flex-col gap-3"><Link className={linkClass} to="/explore">Explore designs</Link><Link className={linkClass} to="/collections">Design folders</Link></nav>
+        <nav className="mt-4 flex flex-col gap-3"><Link className={linkClass} to="/explore">Explore designs</Link><Link className={linkClass} to="/collections">Design folders</Link><Link className={linkClass} to="/catalogs">Catalogs</Link></nav>
       </div>
 
       <div>

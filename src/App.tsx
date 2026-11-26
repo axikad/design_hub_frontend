@@ -19,6 +19,8 @@ const ExplorePage = page(() => import('./pages/ExplorePage'), 'ExplorePage');
 const DesignDetailsPage = page(() => import('./pages/DesignDetailsPage'), 'DesignDetailsPage');
 const CollectionsPage = page(() => import('./pages/CollectionsPage'), 'CollectionsPage');
 const CollectionDetailPage = page(() => import('./pages/CollectionDetailPage'), 'CollectionDetailPage');
+const CatalogsPage = page(() => import('./pages/CatalogsPage'), 'CatalogsPage');
+const CatalogDetailPage = page(() => import('./pages/CatalogDetailPage'), 'CatalogDetailPage');
 const CheckoutPage = page(() => import('./pages/CheckoutPage'), 'CheckoutPage');
 const AuthPage = page(() => import('./pages/AuthPage'), 'AuthPage');
 const BuyerAccountPage = page(() => import('./pages/BuyerAccountPage'), 'BuyerAccountPage');
@@ -27,6 +29,7 @@ const StudioDashboardPage = page(() => import('./pages/studio/StudioDashboardPag
 const MyDesignsPage = page(() => import('./pages/studio/MyDesignsPage'), 'MyDesignsPage');
 const AddEditDesignPage = page(() => import('./pages/studio/AddEditDesignPage'), 'AddEditDesignPage');
 const MyCollectionsPage = page(() => import('./pages/studio/MyCollectionsPage'), 'MyCollectionsPage');
+const MyCatalogsPage = page(() => import('./pages/studio/MyCatalogsPage'), 'MyCatalogsPage');
 const SellerWalletPage = page(() => import('./pages/studio/SellerWalletPage'), 'SellerWalletPage');
 const AboutPage = page(() => import('./pages/legal/LegalPages'), 'AboutPage');
 const TermsPage = page(() => import('./pages/legal/LegalPages'), 'TermsPage');
@@ -40,12 +43,14 @@ const routeTitles: Record<string, string> = {
   '/': 'Textile Design Hub',
   '/explore': 'Explore designs',
   '/collections': 'Design folders',
+  '/catalogs': 'Catalogs',
   '/auth': 'Sign in',
   '/account': 'My account',
   '/account/purchases': 'My purchases',
   '/studio': 'My studio',
   '/studio/designs': 'My designs',
   '/studio/collections': 'My folders',
+  '/studio/catalogs': 'My catalogs',
   '/studio/wallet': 'Wallet & settlements',
 };
 
@@ -55,7 +60,7 @@ const RouteEffects = () => {
   useEffect(() => {
     window.scrollTo(0, 0);
     const exactTitle = routeTitles[pathname];
-    const sectionTitle = pathname.startsWith('/design/') ? 'Design details' : pathname.startsWith('/collections/') ? 'Folder details' : undefined;
+    const sectionTitle = pathname.startsWith('/design/') ? 'Design details' : pathname.startsWith('/collections/') ? 'Folder details' : pathname.startsWith('/catalogs/') ? 'Catalog details' : undefined;
     document.title = `${exactTitle || sectionTitle || 'Textile Design Hub'} | Textile Design Hub`;
     if (firstRender.current) {
       firstRender.current = false;
@@ -98,6 +103,8 @@ export default function App() {
               <Route path="/design/:id" element={<DesignDetailsPage />} />
               <Route path="/collections" element={<CollectionsPage />} />
               <Route path="/collections/:id" element={<CollectionDetailPage />} />
+              <Route path="/catalogs" element={<CatalogsPage />} />
+              <Route path="/catalogs/:id" element={<CatalogDetailPage />} />
               <Route path="/creator/:id" element={<Navigate to="/explore" replace />} />
 
               {/* Checkout & Commerce */}
@@ -116,6 +123,7 @@ export default function App() {
               <Route path="/studio/designs/new" element={<RequireAccount seller><AddEditDesignPage /></RequireAccount>} />
               <Route path="/studio/designs/edit/:id" element={<RequireAccount seller><AddEditDesignPage /></RequireAccount>} />
               <Route path="/studio/collections" element={<RequireAccount seller><MyCollectionsPage /></RequireAccount>} />
+              <Route path="/studio/catalogs" element={<RequireAccount seller><MyCatalogsPage /></RequireAccount>} />
               <Route path="/studio/wallet" element={<RequireAccount seller><SellerWalletPage /></RequireAccount>} />
 
               {/* Settings, Legal & Support */}

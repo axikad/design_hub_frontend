@@ -12,6 +12,7 @@ export const StudioDashboardPage: React.FC = () => {
   const [folders, setFolders] = useState<ApiFolder[]>([]);
   const [designTotal, setDesignTotal] = useState(0);
   const [folderTotal, setFolderTotal] = useState(0);
+  const [catalogTotal, setCatalogTotal] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -19,11 +20,13 @@ export const StudioDashboardPage: React.FC = () => {
     Promise.all([
       studioApi.myDesigns({ page: 1, per_page: 5 }, controller.signal),
       studioApi.myFolders({ page: 1, per_page: 5 }, controller.signal),
-    ]).then(([designResponse, folderResponse]) => {
+      studioApi.myCatalogs({ page: 1, per_page: 1 }, controller.signal),
+    ]).then(([designResponse, folderResponse, catalogResponse]) => {
       setDesigns(designResponse.data);
       setFolders(folderResponse.data);
       setDesignTotal(designResponse.meta.total);
       setFolderTotal(folderResponse.meta.total);
+      setCatalogTotal(catalogResponse.meta.total);
     }).catch((error) => {
       if (!(error instanceof DOMException && error.name === 'AbortError')) {
         showToast('Could not load studio summary', getErrorMessage(error), 'error');
@@ -40,9 +43,10 @@ export const StudioDashboardPage: React.FC = () => {
 
       <div className="mx-auto max-w-7xl space-y-8 px-4 py-8 sm:px-6 lg:px-8">
         {loading ? <div className="flex min-h-48 items-center justify-center rounded-2xl border border-stone-200 bg-white text-stone-500"><LoaderCircle className="mr-2 h-5 w-5 animate-spin" />Loading studio…</div> : <>
-          <section className="grid gap-4 sm:grid-cols-2">
+          <section className="grid gap-4 sm:grid-cols-3">
             <Link to="/studio/designs" className="rounded-2xl border border-stone-200 bg-white p-6 transition hover:border-amber-400"><UploadCloud className="h-5 w-5 text-amber-800" /><p className="mt-4 text-xs font-semibold uppercase tracking-wider text-stone-500">Marketplace designs</p><p className="mt-1 font-mono text-3xl font-bold text-stone-950">{designTotal}</p><p className="mt-2 text-sm text-stone-500">Create, edit and remove records owned by this account.</p></Link>
             <Link to="/studio/collections" className="rounded-2xl border border-stone-200 bg-white p-6 transition hover:border-amber-400"><FolderOpen className="h-5 w-5 text-amber-800" /><p className="mt-4 text-xs font-semibold uppercase tracking-wider text-stone-500">Design folders</p><p className="mt-1 font-mono text-3xl font-bold text-stone-950">{folderTotal}</p><p className="mt-2 text-sm text-stone-500">Archive listings created by this account.</p></Link>
+            <Link to="/studio/catalogs" className="rounded-2xl border border-stone-200 bg-white p-6 transition hover:border-amber-400"><FolderOpen className="h-5 w-5 text-amber-800" /><p className="mt-4 text-xs font-semibold uppercase tracking-wider text-stone-500">Catalogs</p><p className="mt-1 font-mono text-3xl font-bold text-stone-950">{catalogTotal}</p><p className="mt-2 text-sm text-stone-500">Independent catalog archives created by this account.</p></Link>
           </section>
 
           <div className="grid gap-6 lg:grid-cols-2">

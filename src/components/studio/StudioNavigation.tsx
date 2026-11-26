@@ -57,6 +57,7 @@ export const StudioNavigation: React.FC = () => {
             <Link to="/studio" className={tabClass(pathname === '/studio')}><LayoutDashboard className="h-4 w-4" /> Overview</Link>
             <Link to="/studio/designs" className={tabClass(pathname.startsWith('/studio/designs'))}><Layers3 className="h-4 w-4" /> My designs{designTotal === null ? '' : ` (${designTotal})`}</Link>
             <Link to="/studio/collections" className={tabClass(pathname.startsWith('/studio/collections'))}><Folders className="h-4 w-4" /> Folders{folderTotal === null ? '' : ` (${folderTotal})`}</Link>
+            <Link to="/studio/catalogs" className={tabClass(pathname.startsWith('/studio/catalogs'))}><Folders className="h-4 w-4" /> Catalogs</Link>
             <Link to="/studio/wallet" className={tabClass(pathname.startsWith('/studio/wallet'))}><Wallet className="h-4 w-4" /> Wallet</Link>
           </nav>
         </div>

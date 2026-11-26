@@ -1,4 +1,4 @@
-export type CheckoutItemType = 'design' | 'folder';
+export type CheckoutItemType = 'design' | 'folder' | 'catalog';
 
 export interface CheckoutTaxLine {
   type?: 'cgst' | 'sgst' | 'igst';
@@ -41,6 +41,7 @@ export interface CheckoutPreview {
 export interface CheckoutOrder {
   designId?: string;
   folderId?: string;
+  catalogId?: string;
   orderId: string;
   keyId: string;
   amount: number;
@@ -54,6 +55,7 @@ export interface CheckoutOrder {
 export interface PurchaseStatus {
   designId?: string;
   folderId?: string;
+  catalogId?: string;
   status: 'unpaid' | 'pending' | 'paid';
   purchaseId?: string;
 }
@@ -72,6 +74,12 @@ export interface DesignDownloadGrant {
 
 export interface FolderDownloadGrant {
   folderId: string;
+  downloadUri: string;
+  expiresAt: string;
+}
+
+export interface CatalogDownloadGrant {
+  catalogId: string;
   downloadUri: string;
   expiresAt: string;
 }

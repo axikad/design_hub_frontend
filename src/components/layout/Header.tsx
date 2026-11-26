@@ -62,6 +62,7 @@ export const Header: React.FC = () => {
           <nav aria-label="Primary navigation" className="hidden items-center gap-7 text-sm lg:flex">
             <Link to="/explore" aria-current={active('/explore') ? 'page' : undefined} className={navClass('/explore')}>Explore</Link>
             <Link to="/collections" aria-current={active('/collections') ? 'page' : undefined} className={navClass('/collections')}>Design folders</Link>
+            <Link to="/catalogs" aria-current={active('/catalogs') ? 'page' : undefined} className={navClass('/catalogs')}>Catalogs</Link>
             {user.isLoggedIn && user.role === 'seller' && <Link to="/studio" aria-current={active('/studio') ? 'page' : undefined} className={navClass('/studio')}>My studio</Link>}
           </nav>
 
@@ -127,6 +128,7 @@ export const Header: React.FC = () => {
             <nav className="mt-6 flex flex-col gap-1 text-base">
               <Link to="/explore" className="rounded-lg px-3 py-3 hover:bg-stone-50">Explore designs</Link>
               <Link to="/collections" className="rounded-lg px-3 py-3 hover:bg-stone-50">Design folders</Link>
+              <Link to="/catalogs" className="rounded-lg px-3 py-3 hover:bg-stone-50">Catalogs</Link>
               {user.isLoggedIn && <Link to="/account" className="rounded-lg px-3 py-3 hover:bg-stone-50">My account</Link>}
               {user.isLoggedIn && <Link to="/account/purchases" className="rounded-lg px-3 py-3 hover:bg-stone-50">Purchases</Link>}
               {user.isLoggedIn && user.role === 'seller' && <Link to="/studio" className="rounded-lg px-3 py-3 font-semibold text-amber-900 hover:bg-amber-50">My studio</Link>}
