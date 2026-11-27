@@ -704,13 +704,7 @@ export const AddEditDesignPage: React.FC = () => {
                   </span>
                 </div>
               </div>
-            ) : (
-              <div className="mb-5 inline-flex rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-800">
-                {specificationMode === "design_property"
-                  ? "Design property"
-                  : "Technical specifications"}
-              </div>
-            )}
+            ) : null}
             {variants.map((variant, index) =>
               variant.key === activeVariantKey ? (
                 <VariantCard
