@@ -22,6 +22,7 @@ export interface ApiDesignType {
   typeName: string | null;
   customTypeName?: string | null;
   isCustom?: boolean;
+  specificationMode: 'design_property' | 'technical';
   details: ApiDesignTypeDetails;
 }
 

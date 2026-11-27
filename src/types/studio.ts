@@ -23,6 +23,10 @@ export interface DesignFormConfig {
   stitchFiles: boolean;
   pricing: boolean;
   designTypeImageCards: boolean;
+  specificationModes: {
+    designProperty: boolean;
+    technicalSpecifications: boolean;
+  };
   required: Record<'title' | 'machineType' | 'category' | 'designTypes' | 'designSpecifications' | 'sequenceType' | 'designFileType' | 'previewImages' | 'stitchFiles' | 'pricing', boolean>;
   specificationFields: DesignSpecificationFieldConfig;
 }

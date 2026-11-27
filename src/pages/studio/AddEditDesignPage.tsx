@@ -32,6 +32,7 @@ interface VariantForm {
   typeId: string | null;
   customTypeName: string;
   typeName: string;
+  specificationMode: 'design_property' | 'technical';
   nameOrNumber: string;
   stitchCount: VariantValue;
   needle: VariantValue;
@@ -49,11 +50,21 @@ interface VariantForm {
 
 const money = (paise: number) =>
   `₹${(paise / 100).toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
-const emptyVariant = (type: DesignOptionItem): VariantForm => ({
+const defaultSpecificationMode = (
+  config: DesignFormConfig | null,
+): VariantForm['specificationMode'] =>
+  config?.specificationModes.technicalSpecifications
+    ? 'technical'
+    : 'design_property';
+const emptyVariant = (
+  type: DesignOptionItem,
+  specificationMode: VariantForm['specificationMode'] = 'technical',
+): VariantForm => ({
   key: `type:${type.id}`,
   typeId: type.id,
   customTypeName: "",
   typeName: type.name,
+  specificationMode,
   nameOrNumber: "",
   stitchCount: "",
   needle: "",
@@ -147,6 +158,7 @@ export const AddEditDesignPage: React.FC = () => {
             typeId: item.typeId,
             customTypeName: item.customTypeName || "",
             typeName: item.typeName || item.customTypeName || "Custom type",
+            specificationMode: item.specificationMode || "technical",
             nameOrNumber: item.details.nameOrNumber || "",
             stitchCount: item.details.stitchCount ?? "",
             needle: item.details.needle ?? "",
@@ -275,7 +287,7 @@ export const AddEditDesignPage: React.FC = () => {
       setActiveVariantKey(next[Math.max(0, removedIndex - 1)]?.key ?? "");
       return;
     }
-    const nextVariant = emptyVariant(type);
+    const nextVariant = emptyVariant(type, defaultSpecificationMode(config));
     setVariants((current) => [...current, nextVariant]);
     setActiveVariantKey(nextVariant.key);
   };
@@ -285,7 +297,10 @@ export const AddEditDesignPage: React.FC = () => {
     const key = `custom:${value.toLowerCase()}`;
     if (variants.some((item) => item.key === key)) return;
     const nextVariant = {
-      ...emptyVariant({ id: key, name: value }),
+      ...emptyVariant(
+        { id: key, name: value },
+        defaultSpecificationMode(config),
+      ),
       key,
       typeId: null,
       customTypeName: value,
@@ -346,26 +361,27 @@ export const AddEditDesignPage: React.FC = () => {
           const fields = config.specificationFields;
           if (fields.nameOrNumber && variant.nameOrNumber !== "")
             details.nameOrNumber = variant.nameOrNumber;
-          if (fields.stitchCount && variant.stitchCount !== "")
+          if (variant.specificationMode === "technical" && fields.stitchCount && variant.stitchCount !== "")
             details.stitchCount = numericValue(variant.stitchCount);
-          if (fields.needle && variant.needle !== "")
+          if (variant.specificationMode === "technical" && fields.needle && variant.needle !== "")
             details.needle = numericValue(variant.needle);
-          if (fields.area && variant.area !== "")
+          if (variant.specificationMode === "technical" && fields.area && variant.area !== "")
             details.area = numericValue(variant.area);
-          if (fields.height && variant.height !== "")
+          if (variant.specificationMode === "technical" && fields.height && variant.height !== "")
             details.height = numericValue(variant.height);
-          if (fields.width && variant.width !== "")
+          if (variant.specificationMode === "technical" && fields.width && variant.width !== "")
             details.width = numericValue(variant.width);
-          if (fields.image && variant.imageFile) {
+          if (variant.specificationMode === "design_property" && fields.image && variant.imageFile) {
             const [uploaded] = await uploadFiles([variant.imageFile]);
             details.image = uploaded;
-          } else if (fields.image && variant.removeImage) {
+          } else if (variant.specificationMode === "design_property" && fields.image && variant.removeImage) {
             details.removeImage = true;
           }
           return {
             ...(variant.typeId
               ? { typeId: variant.typeId }
               : { customTypeName: variant.customTypeName }),
+            specificationMode: variant.specificationMode,
             ...(config.designSpecifications ? { details } : {}),
           };
         }),
@@ -1037,7 +1053,29 @@ const VariantCard = ({
         </button>
       </div>
       {config.designSpecifications && (
-        <div className="mt-4 grid gap-4 sm:grid-cols-3">
+        <div className="mt-4">
+          {config.specificationModes.designProperty &&
+            config.specificationModes.technicalSpecifications && (
+              <div className="mb-4 grid gap-1 rounded-xl bg-stone-200 p-1 sm:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={() => onChange({ specificationMode: "design_property" })}
+                  className={`rounded-lg px-4 py-2.5 text-sm font-semibold ${value.specificationMode === "design_property" ? "bg-white text-amber-800 shadow-sm" : "text-stone-500"}`}
+                >
+                  Design property
+                  <span className="mt-0.5 block text-xs font-normal">Name or number + image</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onChange({ specificationMode: "technical" })}
+                  className={`rounded-lg px-4 py-2.5 text-sm font-semibold ${value.specificationMode === "technical" ? "bg-white text-amber-800 shadow-sm" : "text-stone-500"}`}
+                >
+                  Technical specifications
+                  <span className="mt-0.5 block text-xs font-normal">Name or number + production values</span>
+                </button>
+              </div>
+            )}
+          <div className="grid gap-4 sm:grid-cols-3">
           {fields.nameOrNumber && (
             <SpecInput
               label="Name or number"
@@ -1046,7 +1084,7 @@ const VariantCard = ({
               onChange={(next) => onChange({ nameOrNumber: next })}
             />
           )}
-          {fields.stitchCount && (
+          {value.specificationMode === "technical" && fields.stitchCount && (
             <SpecInput
               label="Stitch count"
               type="number"
@@ -1055,7 +1093,7 @@ const VariantCard = ({
               onChange={(next) => onChange({ stitchCount: next })}
             />
           )}
-          {fields.needle && (
+          {value.specificationMode === "technical" && fields.needle && (
             <SpecInput
               label="Needle"
               type="number"
@@ -1064,7 +1102,7 @@ const VariantCard = ({
               onChange={(next) => onChange({ needle: next })}
             />
           )}
-          {fields.area && (
+          {value.specificationMode === "technical" && fields.area && (
             <SpecInput
               label="Area (mm)"
               type="number"
@@ -1074,7 +1112,7 @@ const VariantCard = ({
               onChange={(next) => onChange({ area: next })}
             />
           )}
-          {fields.height && (
+          {value.specificationMode === "technical" && fields.height && (
             <SpecInput
               label="Height (mm)"
               type="number"
@@ -1084,7 +1122,7 @@ const VariantCard = ({
               onChange={(next) => onChange({ height: next })}
             />
           )}
-          {fields.width && (
+          {value.specificationMode === "technical" && fields.width && (
             <SpecInput
               label="Width (mm)"
               type="number"
@@ -1094,7 +1132,7 @@ const VariantCard = ({
               onChange={(next) => onChange({ width: next })}
             />
           )}
-          {fields.image && (
+          {value.specificationMode === "design_property" && fields.image && (
             <div className="sm:col-span-3">
               <div className="flex flex-col gap-4 rounded-xl border border-stone-200 bg-white p-4 sm:flex-row sm:items-center">
                 {imagePreview && !value.removeImage ? (
@@ -1110,7 +1148,7 @@ const VariantCard = ({
                 )}
                 <div className="flex-1">
                   <p className="text-sm font-semibold text-stone-800">
-                    Design-type image {fields.required.image && <RequiredMark />}
+                    Design property <RequiredMark />
                   </p>
                   <p className="mt-1 text-xs text-stone-500">
                     {value.imageFile?.name ||
@@ -1125,7 +1163,7 @@ const VariantCard = ({
                       <input
                         type="file"
                         accept="image/*"
-                        required={fields.required.image && !value.existingImage}
+                        required={!value.existingImage}
                         onChange={(event) =>
                           onChange({
                             imageFile: event.target.files?.[0] || null,
@@ -1135,26 +1173,12 @@ const VariantCard = ({
                         className="sr-only"
                       />
                     </label>
-                    {!fields.required.image &&
-                      (value.existingImage || value.imageFile) && (
-                        <button
-                          type="button"
-                          onClick={() =>
-                            onChange({
-                              imageFile: null,
-                              removeImage: Boolean(value.existingImage),
-                            })
-                          }
-                          className="rounded-lg border border-stone-300 px-3 py-2 text-xs font-semibold text-stone-600"
-                        >
-                          Remove
-                        </button>
-                      )}
                   </div>
                 </div>
               </div>
             </div>
           )}
+          </div>
         </div>
       )}
       <FieldError message={error} />
