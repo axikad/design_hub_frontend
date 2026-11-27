@@ -34,7 +34,6 @@ export interface UserProfile {
   permissions: string[];
   taxStateCode: string;
   gstRegistered: boolean;
-  gstNumber: string;
 }
 
 interface AppContextType {

@@ -112,6 +112,8 @@ export const AddEditDesignPage: React.FC = () => {
     [machineId, options],
   );
   const config: DesignFormConfig | null = machine?.designFormConfig ?? null;
+  const specificationMode =
+    variants[0]?.specificationMode ?? defaultSpecificationMode(config);
   const machineTypes = useMemo(
     () =>
       options?.machineTypes.filter((item) =>
@@ -150,6 +152,12 @@ export const AddEditDesignPage: React.FC = () => {
         setPriceRupees(design?.pricePaise != null ? String(design.pricePaise / 100) : "");
         setExistingImages(design?.images ?? []);
         setExistingFiles(design?.files ?? []);
+        const loadedMachine = optionResponse.data.machines.find(
+          (item) => item.id === initialMachine,
+        );
+        const loadedSpecificationMode =
+          design?.designTypes?.[0]?.specificationMode ||
+          defaultSpecificationMode(loadedMachine?.designFormConfig ?? null);
         const loadedVariants = (design?.designTypes ?? []).map(
           (item, index) => ({
             key: item.typeId
@@ -158,7 +166,7 @@ export const AddEditDesignPage: React.FC = () => {
             typeId: item.typeId,
             customTypeName: item.customTypeName || "",
             typeName: item.typeName || item.customTypeName || "Custom type",
-            specificationMode: item.specificationMode || "technical",
+            specificationMode: loadedSpecificationMode,
             nameOrNumber: item.details.nameOrNumber || "",
             stitchCount: item.details.stitchCount ?? "",
             needle: item.details.needle ?? "",
@@ -287,7 +295,7 @@ export const AddEditDesignPage: React.FC = () => {
       setActiveVariantKey(next[Math.max(0, removedIndex - 1)]?.key ?? "");
       return;
     }
-    const nextVariant = emptyVariant(type, defaultSpecificationMode(config));
+    const nextVariant = emptyVariant(type, specificationMode);
     setVariants((current) => [...current, nextVariant]);
     setActiveVariantKey(nextVariant.key);
   };
@@ -299,7 +307,7 @@ export const AddEditDesignPage: React.FC = () => {
     const nextVariant = {
       ...emptyVariant(
         { id: key, name: value },
-        defaultSpecificationMode(config),
+        specificationMode,
       ),
       key,
       typeId: null,
@@ -321,6 +329,11 @@ export const AddEditDesignPage: React.FC = () => {
       current.map((item, itemIndex) =>
         itemIndex === index ? { ...item, ...patch } : item,
       ),
+    );
+  };
+  const updateSpecificationMode = (mode: VariantForm["specificationMode"]) => {
+    setVariants((current) =>
+      current.map((item) => ({ ...item, specificationMode: mode })),
     );
   };
   const firstError = (prefix: string) =>
@@ -649,6 +662,55 @@ export const AddEditDesignPage: React.FC = () => {
             description="Enter specifications and one image for every catalog or custom design type."
             icon={Layers3}
           >
+            {config.specificationModes.designProperty &&
+            config.specificationModes.technicalSpecifications ? (
+              <div className="mb-5 flex flex-col gap-3 rounded-xl border border-stone-200 bg-stone-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-stone-900">
+                    Specification mode
+                  </p>
+                  <p className="mt-1 text-xs text-stone-500">
+                    This selection applies to every design type.
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span
+                    className={`text-sm font-semibold ${specificationMode === "design_property" ? "text-amber-800" : "text-stone-500"}`}
+                  >
+                    Design property
+                  </span>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={specificationMode === "technical"}
+                    aria-label="Use technical specifications for every design type"
+                    onClick={() =>
+                      updateSpecificationMode(
+                        specificationMode === "technical"
+                          ? "design_property"
+                          : "technical",
+                      )
+                    }
+                    className={`relative h-7 w-12 rounded-full transition ${specificationMode === "technical" ? "bg-amber-700" : "bg-stone-300"}`}
+                  >
+                    <span
+                      className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow-sm transition ${specificationMode === "technical" ? "left-6" : "left-1"}`}
+                    />
+                  </button>
+                  <span
+                    className={`text-sm font-semibold ${specificationMode === "technical" ? "text-amber-800" : "text-stone-500"}`}
+                  >
+                    Technical specifications
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <div className="mb-5 inline-flex rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-800">
+                {specificationMode === "design_property"
+                  ? "Design property"
+                  : "Technical specifications"}
+              </div>
+            )}
             {variants.map((variant, index) =>
               variant.key === activeVariantKey ? (
                 <VariantCard
@@ -1054,27 +1116,6 @@ const VariantCard = ({
       </div>
       {config.designSpecifications && (
         <div className="mt-4">
-          {config.specificationModes.designProperty &&
-            config.specificationModes.technicalSpecifications && (
-              <div className="mb-4 grid gap-1 rounded-xl bg-stone-200 p-1 sm:grid-cols-2">
-                <button
-                  type="button"
-                  onClick={() => onChange({ specificationMode: "design_property" })}
-                  className={`rounded-lg px-4 py-2.5 text-sm font-semibold ${value.specificationMode === "design_property" ? "bg-white text-amber-800 shadow-sm" : "text-stone-500"}`}
-                >
-                  Design property
-                  <span className="mt-0.5 block text-xs font-normal">Name or number + image</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onChange({ specificationMode: "technical" })}
-                  className={`rounded-lg px-4 py-2.5 text-sm font-semibold ${value.specificationMode === "technical" ? "bg-white text-amber-800 shadow-sm" : "text-stone-500"}`}
-                >
-                  Technical specifications
-                  <span className="mt-0.5 block text-xs font-normal">Name or number + production values</span>
-                </button>
-              </div>
-            )}
           <div className="grid gap-4 sm:grid-cols-3">
           {fields.nameOrNumber && (
             <SpecInput
