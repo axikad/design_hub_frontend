@@ -14,6 +14,7 @@ import {
   UserRound,
 } from "lucide-react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { ConfirmationDialog } from "../../components/common/ConfirmationDialog";
 import { StudioNavigation } from "../../components/studio/StudioNavigation";
 import { useApp } from "../../context/AppContext";
 import { ApiError, getErrorMessage, studioApi } from "../../lib/api-client";
@@ -105,6 +106,9 @@ export const AddEditDesignPage: React.FC = () => {
   const [existingImages, setExistingImages] = useState<ApiImage[]>([]);
   const [existingFiles, setExistingFiles] = useState<ApiDesign["files"]>([]);
   const [pricing, setPricing] = useState<PricingPreview | null>(null);
+  const [pendingSpecificationMode, setPendingSpecificationMode] = useState<
+    VariantForm["specificationMode"] | null
+  >(null);
 
   const machine = useMemo(
     () => options?.machines.find((item) => item.id === machineId) ?? null,
@@ -331,17 +335,7 @@ export const AddEditDesignPage: React.FC = () => {
       ),
     );
   };
-  const updateSpecificationMode = (mode: VariantForm["specificationMode"]) => {
-    if (mode === specificationMode) return;
-
-    const typeNames = variants.map(
-      (item, index) =>
-        item.typeName || item.customTypeName || `Custom type ${index + 1}`,
-    );
-    const removedValues =
-      mode === "design_property"
-        ? "stitch count, needle, area, height and width"
-        : "design property images";
+  const applySpecificationMode = (mode: VariantForm["specificationMode"]) => {
     const hasDiscardedData = variants.some((item) =>
       mode === "design_property"
         ? [item.stitchCount, item.needle, item.area, item.height, item.width].some(
@@ -349,13 +343,16 @@ export const AddEditDesignPage: React.FC = () => {
           )
         : Boolean(item.imageFile || item.existingImage),
     );
-    const confirmed =
-      !hasDiscardedData ||
-      window.confirm(
-        `Change all selected design types to ${mode === "design_property" ? "Design property" : "Technical specifications"} mode?\n\nThis global switch applies to: ${typeNames.join(", ")}.\nThe entered ${removedValues} will be removed. You will need to enter the fields required by the new mode again.`,
-      );
+    if (hasDiscardedData) {
+      setPendingSpecificationMode(mode);
+      return;
+    }
 
-    if (!confirmed) return;
+    commitSpecificationMode(mode);
+  };
+
+  const commitSpecificationMode = (mode: VariantForm["specificationMode"]) => {
+    setPendingSpecificationMode(null);
 
     setVariants((current) =>
       current.map((item) => ({
@@ -535,6 +532,24 @@ export const AddEditDesignPage: React.FC = () => {
 
   return (
     <main className="min-h-screen bg-[#FAF8F5] pb-24">
+      <ConfirmationDialog
+        isOpen={pendingSpecificationMode !== null}
+        title={`Change to ${pendingSpecificationMode === "design_property" ? "Design property" : "Technical specifications"}?`}
+        message={`This global switch applies to ${variants
+          .map(
+            (item, index) =>
+              item.typeName ||
+              item.customTypeName ||
+              `Custom type ${index + 1}`,
+          )
+          .join(", ")}. The entered ${pendingSpecificationMode === "design_property" ? "stitch count, needle, area, height and width" : "design property images"} will be removed. You will need to enter the required fields again.`}
+        confirmLabel="Change mode"
+        onCancel={() => setPendingSpecificationMode(null)}
+        onConfirm={() => {
+          if (pendingSpecificationMode)
+            commitSpecificationMode(pendingSpecificationMode);
+        }}
+      />
       <StudioNavigation />
       <header className="border-b border-stone-200 bg-white py-6">
         <div className="mx-auto flex max-w-4xl items-center justify-between px-4 sm:px-6">
@@ -728,7 +743,7 @@ export const AddEditDesignPage: React.FC = () => {
                     aria-checked={specificationMode === "design_property"}
                     aria-label="Use design property mode for all selected design types"
                     onClick={() =>
-                      updateSpecificationMode(
+                      applySpecificationMode(
                         specificationMode === "design_property"
                           ? "technical"
                           : "design_property",
