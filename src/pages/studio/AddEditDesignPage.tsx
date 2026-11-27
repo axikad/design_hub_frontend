@@ -97,7 +97,6 @@ export const AddEditDesignPage: React.FC = () => {
   const [title, setTitle] = useState("");
   const [variants, setVariants] = useState<VariantForm[]>([]);
   const [activeVariantKey, setActiveVariantKey] = useState("");
-  const [customType, setCustomType] = useState("");
   const [sequenceType, setSequenceType] = useState<VariantValue>("");
   const [designFileTypeId, setDesignFileTypeId] = useState("");
   const [priceRupees, setPriceRupees] = useState("");
@@ -300,22 +299,19 @@ export const AddEditDesignPage: React.FC = () => {
     setActiveVariantKey(nextVariant.key);
   };
   const addCustomType = () => {
-    const value = customType.trim();
-    if (!value) return;
-    const key = `custom:${value.toLowerCase()}`;
-    if (variants.some((item) => item.key === key)) return;
+    const customIndex = variants.filter((item) => !item.typeId).length + 1;
+    const key = `custom:${Date.now()}:${customIndex}`;
     const nextVariant = {
       ...emptyVariant(
-        { id: key, name: value },
+        { id: key, name: `Custom type ${customIndex}` },
         specificationMode,
       ),
       key,
       typeId: null,
-      customTypeName: value,
+      customTypeName: "",
     };
     setVariants((current) => [...current, nextVariant]);
     setActiveVariantKey(nextVariant.key);
-    setCustomType("");
   };
   const removeVariant = (key: string) => {
     const removedIndex = variants.findIndex((item) => item.key === key);
@@ -584,13 +580,25 @@ export const AddEditDesignPage: React.FC = () => {
           </div>
           {config.designTypes && (
             <div className="mt-5">
-              <p className="text-sm font-semibold text-stone-700">
-                Design types {config.required.designTypes && <RequiredMark />}
-              </p>
-              <p className="mt-1 text-xs text-stone-500">
-                Select every type included in this design. Click a selected type
-                to open its specifications.
-              </p>
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-stone-700">
+                    Design types {config.required.designTypes && <RequiredMark />}
+                  </p>
+                  <p className="mt-1 text-xs text-stone-500">
+                    Select every type included in this design. Click a selected type
+                    to open its specifications.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={addCustomType}
+                  className="inline-flex shrink-0 items-center rounded-xl border border-stone-300 px-4 py-2.5 text-sm font-semibold hover:border-amber-700"
+                >
+                  <Plus className="mr-1 h-4 w-4" />
+                  Add custom type
+                </button>
+              </div>
               <div className="mt-3 flex flex-wrap gap-2">
                 {designTypes.map((type) => {
                   const variant = variants.find(
@@ -624,33 +632,11 @@ export const AddEditDesignPage: React.FC = () => {
                         }
                         className={`rounded-full border px-4 py-2 text-sm font-semibold transition ${activeVariantKey === variant.key ? "border-stone-950 bg-stone-950 text-white shadow-sm" : "border-amber-700 bg-amber-50 text-amber-950"}`}
                       >
-                        {variant.customTypeName}
+                        {variant.customTypeName || "Custom type"}
                       </button>
                     ))}
                 </div>
               )}
-              <div className="mt-4 flex max-w-lg gap-2">
-                <input
-                  value={customType}
-                  onChange={(event) => setCustomType(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") {
-                      event.preventDefault();
-                      addCustomType();
-                    }
-                  }}
-                  placeholder="Optional custom type"
-                  className="min-w-0 flex-1 rounded-xl border border-stone-300 px-3 py-2.5 text-sm outline-none focus:border-amber-700"
-                />
-                <button
-                  type="button"
-                  onClick={addCustomType}
-                  className="inline-flex items-center rounded-xl border border-stone-300 px-4 text-sm font-semibold hover:border-amber-700"
-                >
-                  <Plus className="mr-1 h-4 w-4" />
-                  Add custom
-                </button>
-              </div>
               <FieldError message={firstError("designTypes")} />
             </div>
           )}
@@ -741,8 +727,8 @@ export const AddEditDesignPage: React.FC = () => {
           >
             <div className="grid items-start gap-5 sm:grid-cols-2">
               {config.pricing && (
-                <div>
-                  <label className="text-sm font-semibold text-stone-700">
+                <div className="contents">
+                  <label className="order-2 text-sm font-semibold text-stone-700">
                     Selling price (INR) {config.required.pricing && <RequiredMark />}
                     <input
                       type="number"
@@ -756,7 +742,8 @@ export const AddEditDesignPage: React.FC = () => {
                     <FieldError message={firstError("pricePaise")} />
                   </label>
                   {pricing && (
-                    <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50/70 p-4 text-sm">
+                    <div className="order-3 rounded-xl border border-amber-200 bg-amber-50/70 p-4 text-sm sm:col-span-2">
+                      <div className="sm:ml-auto sm:w-1/2 sm:pl-2.5">
                       <div className="flex items-center justify-between gap-3">
                         <div className="flex items-center gap-2 font-bold text-stone-900">
                           <ReceiptIndianRupee className="h-4 w-4 text-amber-700" />
@@ -803,12 +790,13 @@ export const AddEditDesignPage: React.FC = () => {
                       <p className="mt-2 text-[10px] leading-4 text-stone-500">
                         Estimate only. Final amounts and tax details are saved when the buyer pays.
                       </p>
+                      </div>
                     </div>
                   )}
                 </div>
               )}
               {config.designFileType && (
-                <div className="self-start">
+                <div className="order-1 self-start">
                   <label className="text-sm font-semibold text-stone-700">
                     Design file type {config.required.designFileType && <RequiredMark />}
                     <select
@@ -1081,7 +1069,7 @@ const VariantCard = ({
             Type {index + 1}
           </p>
           <h3 className="font-serif text-lg font-semibold text-stone-950">
-            {value.typeName}
+            {value.typeId ? value.typeName : value.customTypeName || `Custom type ${index + 1}`}
           </h3>
         </div>
         <button
@@ -1096,6 +1084,14 @@ const VariantCard = ({
       {config.designSpecifications && (
         <div className="mt-4">
           <div className="grid gap-4 sm:grid-cols-3">
+          {!value.typeId && (
+            <SpecInput
+              label="Custom design type name"
+              required
+              value={value.customTypeName}
+              onChange={(next) => onChange({ customTypeName: next })}
+            />
+          )}
           {fields.nameOrNumber && (
             <SpecInput
               label="Name or number"
