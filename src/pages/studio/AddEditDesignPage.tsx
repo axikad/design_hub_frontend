@@ -657,14 +657,10 @@ export const AddEditDesignPage: React.FC = () => {
         </FormPanel>
 
         {config.designSpecifications && variants.length > 0 && (
-          <FormPanel
-            title="Design type specifications"
-            description="Enter specifications and one image for every catalog or custom design type."
-            icon={Layers3}
-          >
+          <>
             {config.specificationModes.designProperty &&
             config.specificationModes.technicalSpecifications ? (
-              <div className="mb-5 flex justify-end">
+              <div className="flex justify-end">
                 <div className="inline-flex items-center gap-3 text-sm font-semibold text-stone-700">
                   <button
                     type="button"
@@ -688,20 +684,26 @@ export const AddEditDesignPage: React.FC = () => {
                 </div>
               </div>
             ) : null}
-            {variants.map((variant, index) =>
-              variant.key === activeVariantKey ? (
-                <VariantCard
-                  key={variant.key}
-                  index={index}
-                  value={variant}
-                  config={config}
-                  error={firstError(`designTypes.${index}`)}
-                  onChange={(patch) => updateVariant(index, patch)}
-                  onRemove={() => removeVariant(variant.key)}
-                />
-              ) : null,
-            )}
-          </FormPanel>
+            <FormPanel
+              title="Design type specifications"
+              description="Enter specifications and one image for every catalog or custom design type."
+              icon={Layers3}
+            >
+              {variants.map((variant, index) =>
+                variant.key === activeVariantKey ? (
+                  <VariantCard
+                    key={variant.key}
+                    index={index}
+                    value={variant}
+                    config={config}
+                    error={firstError(`designTypes.${index}`)}
+                    onChange={(patch) => updateVariant(index, patch)}
+                    onRemove={() => removeVariant(variant.key)}
+                  />
+                ) : null,
+              )}
+            </FormPanel>
+          </>
         )}
 
         {config.sequenceType && (
