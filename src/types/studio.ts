@@ -1,4 +1,9 @@
-import type { ApiDesign, ApiEnvelope, ApiFolder, PaginatedEnvelope } from './marketplace';
+import type {
+  ApiDesign,
+  ApiEnvelope,
+  ApiFolder,
+  PaginatedEnvelope,
+} from "./marketplace";
 
 export interface DesignSpecificationFieldConfig {
   image: boolean;
@@ -8,7 +13,16 @@ export interface DesignSpecificationFieldConfig {
   area: boolean;
   height: boolean;
   width: boolean;
-  required: Record<'image' | 'nameOrNumber' | 'stitchCount' | 'needle' | 'area' | 'height' | 'width', boolean>;
+  required: Record<
+    | "image"
+    | "nameOrNumber"
+    | "stitchCount"
+    | "needle"
+    | "area"
+    | "height"
+    | "width",
+    boolean
+  >;
 }
 
 export interface DesignFormConfig {
@@ -22,12 +36,23 @@ export interface DesignFormConfig {
   previewImages: boolean;
   stitchFiles: boolean;
   pricing: boolean;
-  designTypeImageCards: boolean;
   specificationModes: {
     designProperty: boolean;
     technicalSpecifications: boolean;
   };
-  required: Record<'title' | 'machineType' | 'category' | 'designTypes' | 'designSpecifications' | 'sequenceType' | 'designFileType' | 'previewImages' | 'stitchFiles' | 'pricing', boolean>;
+  required: Record<
+    | "title"
+    | "machineType"
+    | "category"
+    | "designTypes"
+    | "designSpecifications"
+    | "sequenceType"
+    | "designFileType"
+    | "previewImages"
+    | "stitchFiles"
+    | "pricing",
+    boolean
+  >;
   specificationFields: DesignSpecificationFieldConfig;
 }
 
@@ -58,7 +83,9 @@ export interface DesignOptions {
   categories: DesignOptionItem[];
 }
 
-export interface UploadResult { url: string }
+export interface UploadResult {
+  url: string;
+}
 
 export interface PricingPreview {
   currency: string;
@@ -76,8 +103,19 @@ export interface PricingPreview {
   sellerDeductionsPaise: number;
   estimatedSellerEarningPaise: number;
   taxes: {
-    buyerGst: { enabled: boolean; basisPoints: number; percent: number; amountPaise: number; note: string | null };
-    commissionGst: { enabled: boolean; basisPoints: number; percent: number; amountPaise: number };
+    buyerGst: {
+      enabled: boolean;
+      basisPoints: number;
+      percent: number;
+      amountPaise: number;
+      note: string | null;
+    };
+    commissionGst: {
+      enabled: boolean;
+      basisPoints: number;
+      percent: number;
+      amountPaise: number;
+    };
     tds: { enabled: boolean; amountPaise: number };
     gstTcs: { enabled: boolean; amountPaise: number };
   };
@@ -90,4 +128,3 @@ export type DesignEnvelope = ApiEnvelope<ApiDesign>;
 export type FolderEnvelope = ApiEnvelope<ApiFolder>;
 export type MyCatalogsEnvelope = PaginatedEnvelope<ApiFolder[]>;
 export type CatalogEnvelope = ApiEnvelope<ApiFolder>;
-

@@ -32,7 +32,7 @@ interface VariantForm {
   typeId: string | null;
   customTypeName: string;
   typeName: string;
-  specificationMode: 'design_property' | 'technical';
+  specificationMode: "design_property" | "technical";
   nameOrNumber: string;
   stitchCount: VariantValue;
   needle: VariantValue;
@@ -52,13 +52,13 @@ const money = (paise: number) =>
   `₹${(paise / 100).toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
 const defaultSpecificationMode = (
   config: DesignFormConfig | null,
-): VariantForm['specificationMode'] =>
+): VariantForm["specificationMode"] =>
   config?.specificationModes.technicalSpecifications
-    ? 'technical'
-    : 'design_property';
+    ? "technical"
+    : "design_property";
 const emptyVariant = (
   type: DesignOptionItem,
-  specificationMode: VariantForm['specificationMode'] = 'technical',
+  specificationMode: VariantForm["specificationMode"] = "technical",
 ): VariantForm => ({
   key: `type:${type.id}`,
   typeId: type.id,
@@ -148,7 +148,9 @@ export const AddEditDesignPage: React.FC = () => {
         setTitle(design?.title || "");
         setSequenceType(design?.sequenceType || "");
         setDesignFileTypeId(design?.designFileTypeId || "");
-        setPriceRupees(design?.pricePaise != null ? String(design.pricePaise / 100) : "");
+        setPriceRupees(
+          design?.pricePaise != null ? String(design.pricePaise / 100) : "",
+        );
         setExistingImages(design?.images ?? []);
         setExistingFiles(design?.files ?? []);
         const loadedMachine = optionResponse.data.machines.find(
@@ -239,17 +241,19 @@ export const AddEditDesignPage: React.FC = () => {
 
   useEffect(() => {
     const numericPrice = Number(priceRupees);
-    if (!config?.pricing || priceRupees.trim() === "" || !Number.isFinite(numericPrice) || numericPrice <= 0) {
+    if (
+      !config?.pricing ||
+      priceRupees.trim() === "" ||
+      !Number.isFinite(numericPrice) ||
+      numericPrice <= 0
+    ) {
       setPricing(null);
       return;
     }
     const controller = new AbortController();
     const timeout = window.setTimeout(() => {
       studioApi
-        .pricingPreview(
-          Math.round(numericPrice * 100),
-          controller.signal,
-        )
+        .pricingPreview(Math.round(numericPrice * 100), controller.signal)
         .then((response) => setPricing(response.data))
         .catch(() => setPricing(null));
     }, 300);
@@ -328,8 +332,49 @@ export const AddEditDesignPage: React.FC = () => {
     );
   };
   const updateSpecificationMode = (mode: VariantForm["specificationMode"]) => {
+    if (mode === specificationMode) return;
+
+    const typeNames = variants.map(
+      (item, index) =>
+        item.typeName || item.customTypeName || `Custom type ${index + 1}`,
+    );
+    const removedValues =
+      mode === "design_property"
+        ? "stitch count, needle, area, height and width"
+        : "design property images";
+    const hasDiscardedData = variants.some((item) =>
+      mode === "design_property"
+        ? [item.stitchCount, item.needle, item.area, item.height, item.width].some(
+            (value) => String(value).trim() !== "",
+          )
+        : Boolean(item.imageFile || item.existingImage),
+    );
+    const confirmed =
+      !hasDiscardedData ||
+      window.confirm(
+        `Change all selected design types to ${mode === "design_property" ? "Design property" : "Technical specifications"} mode?\n\nThis global switch applies to: ${typeNames.join(", ")}.\nThe entered ${removedValues} will be removed. You will need to enter the fields required by the new mode again.`,
+      );
+
+    if (!confirmed) return;
+
     setVariants((current) =>
-      current.map((item) => ({ ...item, specificationMode: mode })),
+      current.map((item) => ({
+        ...item,
+        specificationMode: mode,
+        ...(mode === "design_property"
+          ? {
+              stitchCount: "",
+              needle: "",
+              area: "",
+              height: "",
+              width: "",
+            }
+          : {
+              imageFile: null,
+              existingImage: null,
+              removeImage: Boolean(item.existingImage || item.imageFile),
+            }),
+      })),
     );
   };
   const firstError = (prefix: string) =>
@@ -370,20 +415,48 @@ export const AddEditDesignPage: React.FC = () => {
           const fields = config.specificationFields;
           if (fields.nameOrNumber && variant.nameOrNumber !== "")
             details.nameOrNumber = variant.nameOrNumber;
-          if (variant.specificationMode === "technical" && fields.stitchCount && variant.stitchCount !== "")
+          if (
+            variant.specificationMode === "technical" &&
+            fields.stitchCount &&
+            variant.stitchCount !== ""
+          )
             details.stitchCount = numericValue(variant.stitchCount);
-          if (variant.specificationMode === "technical" && fields.needle && variant.needle !== "")
+          if (
+            variant.specificationMode === "technical" &&
+            fields.needle &&
+            variant.needle !== ""
+          )
             details.needle = numericValue(variant.needle);
-          if (variant.specificationMode === "technical" && fields.area && variant.area !== "")
+          if (
+            variant.specificationMode === "technical" &&
+            fields.area &&
+            variant.area !== ""
+          )
             details.area = numericValue(variant.area);
-          if (variant.specificationMode === "technical" && fields.height && variant.height !== "")
+          if (
+            variant.specificationMode === "technical" &&
+            fields.height &&
+            variant.height !== ""
+          )
             details.height = numericValue(variant.height);
-          if (variant.specificationMode === "technical" && fields.width && variant.width !== "")
+          if (
+            variant.specificationMode === "technical" &&
+            fields.width &&
+            variant.width !== ""
+          )
             details.width = numericValue(variant.width);
-          if (variant.specificationMode === "design_property" && fields.image && variant.imageFile) {
+          if (
+            variant.specificationMode === "design_property" &&
+            fields.image &&
+            variant.imageFile
+          ) {
             const [uploaded] = await uploadFiles([variant.imageFile]);
             details.image = uploaded;
-          } else if (variant.specificationMode === "design_property" && fields.image && variant.removeImage) {
+          } else if (
+            variant.specificationMode === "design_property" &&
+            fields.image &&
+            variant.removeImage
+          ) {
             details.removeImage = true;
           }
           return {
@@ -583,11 +656,12 @@ export const AddEditDesignPage: React.FC = () => {
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="text-sm font-semibold text-stone-700">
-                    Design types {config.required.designTypes && <RequiredMark />}
+                    Design types{" "}
+                    {config.required.designTypes && <RequiredMark />}
                   </p>
                   <p className="mt-1 text-xs text-stone-500">
-                    Select every type included in this design. Click a selected type
-                    to open its specifications.
+                    Select every type included in this design. Click a selected
+                    type to open its specifications.
                   </p>
                 </div>
                 <button
@@ -652,7 +726,7 @@ export const AddEditDesignPage: React.FC = () => {
                     type="button"
                     role="switch"
                     aria-checked={specificationMode === "design_property"}
-                    aria-label="Use design property mode"
+                    aria-label="Use design property mode for all selected design types"
                     onClick={() =>
                       updateSpecificationMode(
                         specificationMode === "design_property"
@@ -729,7 +803,8 @@ export const AddEditDesignPage: React.FC = () => {
               {config.pricing && (
                 <div className="contents">
                   <label className="order-2 text-sm font-semibold text-stone-700">
-                    Selling price (INR) {config.required.pricing && <RequiredMark />}
+                    Selling price (INR){" "}
+                    {config.required.pricing && <RequiredMark />}
                     <input
                       type="number"
                       min="1"
@@ -744,52 +819,85 @@ export const AddEditDesignPage: React.FC = () => {
                   {pricing && (
                     <div className="order-3 rounded-xl border border-amber-200 bg-amber-50/70 p-4 text-sm sm:col-span-2">
                       <div className="sm:ml-auto sm:w-1/2 sm:pl-2.5">
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-2 font-bold text-stone-900">
-                          <ReceiptIndianRupee className="h-4 w-4 text-amber-700" />
-                          Estimated seller earnings
-                        </div>
-                        {pricing.isTestMode && (
-                          <span className="rounded-full bg-amber-100 px-2 py-1 text-[10px] font-bold tracking-wide text-amber-700 uppercase">Test mode</span>
-                        )}
-                      </div>
-                      <dl className="mt-4 space-y-2">
                         <div className="flex items-center justify-between gap-3">
-                          <dt className="text-stone-500">Selling price</dt>
-                          <dd className="font-mono font-semibold">{money(pricing.itemPricePaise)}</dd>
-                        </div>
-                        {pricing.taxes.buyerGst.enabled && (
-                          <div className="flex items-center justify-between gap-3">
-                            <dt className="text-stone-500">GST charged to buyer ({pricing.taxes.buyerGst.percent}%)</dt>
-                            <dd className="font-mono font-semibold">+{money(pricing.taxes.buyerGst.amountPaise)}</dd>
+                          <div className="flex items-center gap-2 font-bold text-stone-900">
+                            <ReceiptIndianRupee className="h-4 w-4 text-amber-700" />
+                            Estimated seller earnings
                           </div>
-                        )}
-                        <div className="flex items-center justify-between gap-3">
-                          <dt className="font-medium text-stone-700">Buyer will pay</dt>
-                          <dd className="font-mono font-semibold">{money(pricing.buyerPayablePaise)}</dd>
+                          {pricing.isTestMode && (
+                            <span className="rounded-full bg-amber-100 px-2 py-1 text-[10px] font-bold tracking-wide text-amber-700 uppercase">
+                              Test mode
+                            </span>
+                          )}
                         </div>
-                        <div className="flex items-center justify-between gap-3">
-                          <dt className="text-stone-500">Platform commission ({pricing.platformCommission.percent}%)</dt>
-                          <dd className="font-mono font-semibold text-rose-700">-{money(pricing.platformCommission.amountPaise)}</dd>
-                        </div>
-                        {pricing.taxes.commissionGst.enabled && (
+                        <dl className="mt-4 space-y-2">
                           <div className="flex items-center justify-between gap-3">
-                            <dt className="text-stone-500">GST on platform commission ({pricing.taxes.commissionGst.percent}%)</dt>
-                            <dd className="font-mono font-semibold text-rose-700">-{money(pricing.taxes.commissionGst.amountPaise)}</dd>
+                            <dt className="text-stone-500">Selling price</dt>
+                            <dd className="font-mono font-semibold">
+                              {money(pricing.itemPricePaise)}
+                            </dd>
                           </div>
-                        )}
-                        <div className="flex items-center justify-between gap-3">
-                          <dt className="text-stone-500">Seller earning before buyer GST</dt>
-                          <dd className="font-mono font-semibold">{money(pricing.sellerGrossPaise)}</dd>
-                        </div>
-                        <div className="flex items-center justify-between gap-3 border-t border-amber-200 pt-2">
-                          <dt className="font-bold text-stone-800">Estimated wallet credit</dt>
-                          <dd className="font-mono text-base font-bold text-emerald-700">{money(pricing.estimatedSellerEarningPaise)}</dd>
-                        </div>
-                      </dl>
-                      <p className="mt-2 text-[10px] leading-4 text-stone-500">
-                        Estimate only. Final amounts and tax details are saved when the buyer pays.
-                      </p>
+                          {pricing.taxes.buyerGst.enabled && (
+                            <div className="flex items-center justify-between gap-3">
+                              <dt className="text-stone-500">
+                                GST charged to buyer (
+                                {pricing.taxes.buyerGst.percent}%)
+                              </dt>
+                              <dd className="font-mono font-semibold">
+                                +{money(pricing.taxes.buyerGst.amountPaise)}
+                              </dd>
+                            </div>
+                          )}
+                          <div className="flex items-center justify-between gap-3">
+                            <dt className="font-medium text-stone-700">
+                              Buyer will pay
+                            </dt>
+                            <dd className="font-mono font-semibold">
+                              {money(pricing.buyerPayablePaise)}
+                            </dd>
+                          </div>
+                          <div className="flex items-center justify-between gap-3">
+                            <dt className="text-stone-500">
+                              Platform commission (
+                              {pricing.platformCommission.percent}%)
+                            </dt>
+                            <dd className="font-mono font-semibold text-rose-700">
+                              -{money(pricing.platformCommission.amountPaise)}
+                            </dd>
+                          </div>
+                          {pricing.taxes.commissionGst.enabled && (
+                            <div className="flex items-center justify-between gap-3">
+                              <dt className="text-stone-500">
+                                GST on platform commission (
+                                {pricing.taxes.commissionGst.percent}%)
+                              </dt>
+                              <dd className="font-mono font-semibold text-rose-700">
+                                -
+                                {money(pricing.taxes.commissionGst.amountPaise)}
+                              </dd>
+                            </div>
+                          )}
+                          <div className="flex items-center justify-between gap-3">
+                            <dt className="text-stone-500">
+                              Seller earning before buyer GST
+                            </dt>
+                            <dd className="font-mono font-semibold">
+                              {money(pricing.sellerGrossPaise)}
+                            </dd>
+                          </div>
+                          <div className="flex items-center justify-between gap-3 border-t border-amber-200 pt-2">
+                            <dt className="font-bold text-stone-800">
+                              Estimated wallet credit
+                            </dt>
+                            <dd className="font-mono text-base font-bold text-emerald-700">
+                              {money(pricing.estimatedSellerEarningPaise)}
+                            </dd>
+                          </div>
+                        </dl>
+                        <p className="mt-2 text-[10px] leading-4 text-stone-500">
+                          Estimate only. Final amounts and tax details are saved
+                          when the buyer pays.
+                        </p>
                       </div>
                     </div>
                   )}
@@ -798,23 +906,29 @@ export const AddEditDesignPage: React.FC = () => {
               {config.designFileType && (
                 <div className="order-1 self-start">
                   <label className="text-sm font-semibold text-stone-700">
-                    Design file type {config.required.designFileType && <RequiredMark />}
+                    Design file type{" "}
+                    {config.required.designFileType && <RequiredMark />}
                     <select
                       required={config.required.designFileType}
                       value={designFileTypeId}
-                      onChange={(event) => setDesignFileTypeId(event.target.value)}
+                      onChange={(event) =>
+                        setDesignFileTypeId(event.target.value)
+                      }
                       className="mt-2 w-full rounded-xl border border-stone-300 bg-white px-3 py-3 font-normal outline-none focus:border-amber-700"
                     >
                       <option value="">Select file type</option>
                       {fileTypes.map((item) => (
                         <option key={item.id} value={item.id}>
-                          {item.name}{item.extension ? ` (.${item.extension})` : ""}
+                          {item.name}
+                          {item.extension ? ` (.${item.extension})` : ""}
                         </option>
                       ))}
                     </select>
                     <FieldError message={firstError("designFileTypeId")} />
                     {!fileTypes.length && (
-                      <span className="mt-2 block text-xs font-normal text-amber-700">No active file type is connected to this machine.</span>
+                      <span className="mt-2 block text-xs font-normal text-amber-700">
+                        No active file type is connected to this machine.
+                      </span>
                     )}
                   </label>
                 </div>
@@ -1069,131 +1183,135 @@ const VariantCard = ({
             Type {index + 1}
           </p>
           <h3 className="font-serif text-lg font-semibold text-stone-950">
-            {value.typeId ? value.typeName : value.customTypeName || `Custom type ${index + 1}`}
+            {value.typeId
+              ? value.typeName
+              : value.customTypeName || `Custom type ${index + 1}`}
           </h3>
         </div>
-        <button
-          type="button"
-          onClick={onRemove}
-          className="rounded-lg p-2 text-stone-400 hover:bg-rose-50 hover:text-rose-700"
-          aria-label={`Remove ${value.typeName}`}
-        >
-          <Trash2 className="h-4 w-4" />
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={onRemove}
+            className="rounded-lg p-2 text-stone-400 hover:bg-rose-50 hover:text-rose-700"
+            aria-label={`Remove ${value.typeName}`}
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        </div>
       </div>
       {config.designSpecifications && (
         <div className="mt-4">
           <div className="grid gap-4 sm:grid-cols-3">
-          {!value.typeId && (
-            <SpecInput
-              label="Custom design type name"
-              required
-              value={value.customTypeName}
-              onChange={(next) => onChange({ customTypeName: next })}
-            />
-          )}
-          {fields.nameOrNumber && (
-            <SpecInput
-              label="Name or number"
-              required={fields.required.nameOrNumber}
-              value={value.nameOrNumber}
-              onChange={(next) => onChange({ nameOrNumber: next })}
-            />
-          )}
-          {value.specificationMode === "technical" && fields.stitchCount && (
-            <SpecInput
-              label="Stitch count"
-              type="number"
-              required={fields.required.stitchCount}
-              value={value.stitchCount}
-              onChange={(next) => onChange({ stitchCount: next })}
-            />
-          )}
-          {value.specificationMode === "technical" && fields.needle && (
-            <SpecInput
-              label="Needle"
-              type="number"
-              required={fields.required.needle}
-              value={value.needle}
-              onChange={(next) => onChange({ needle: next })}
-            />
-          )}
-          {value.specificationMode === "technical" && fields.area && (
-            <SpecInput
-              label="Area (mm)"
-              type="number"
-              step="0.01"
-              required={fields.required.area}
-              value={value.area}
-              onChange={(next) => onChange({ area: next })}
-            />
-          )}
-          {value.specificationMode === "technical" && fields.height && (
-            <SpecInput
-              label="Height (mm)"
-              type="number"
-              step="0.01"
-              required={fields.required.height}
-              value={value.height}
-              onChange={(next) => onChange({ height: next })}
-            />
-          )}
-          {value.specificationMode === "technical" && fields.width && (
-            <SpecInput
-              label="Width (mm)"
-              type="number"
-              step="0.01"
-              required={fields.required.width}
-              value={value.width}
-              onChange={(next) => onChange({ width: next })}
-            />
-          )}
-          {value.specificationMode === "design_property" && fields.image && (
-            <div className="sm:col-span-3">
-              <div className="flex flex-col gap-4 rounded-xl border border-stone-200 bg-white p-4 sm:flex-row sm:items-center">
-                {imagePreview && !value.removeImage ? (
-                  <img
-                    src={imagePreview}
-                    alt=""
-                    className="h-24 w-24 rounded-lg border border-stone-200 object-cover"
-                  />
-                ) : (
-                  <span className="flex h-24 w-24 items-center justify-center rounded-lg bg-stone-100">
-                    <ImageIcon className="h-6 w-6 text-stone-400" />
-                  </span>
-                )}
-                <div className="flex-1">
-                  <p className="text-sm font-semibold text-stone-800">
-                    Design property <RequiredMark />
-                  </p>
-                  <p className="mt-1 text-xs text-stone-500">
-                    {value.imageFile?.name ||
-                      value.existingImage?.name ||
-                      "No image selected"}
-                  </p>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <label className="cursor-pointer rounded-lg bg-stone-950 px-3 py-2 text-xs font-semibold text-white">
-                      {value.existingImage || value.imageFile
-                        ? "Replace image"
-                        : "Select image"}
-                      <input
-                        type="file"
-                        accept="image/*"
-                        required={!value.existingImage}
-                        onChange={(event) =>
-                          onChange({
-                            imageFile: event.target.files?.[0] || null,
-                            removeImage: false,
-                          })
-                        }
-                        className="sr-only"
-                      />
-                    </label>
+            {!value.typeId && (
+              <SpecInput
+                label="Custom design type name"
+                required
+                value={value.customTypeName}
+                onChange={(next) => onChange({ customTypeName: next })}
+              />
+            )}
+            {fields.nameOrNumber && (
+              <SpecInput
+                label="Name or number"
+                required={fields.required.nameOrNumber}
+                value={value.nameOrNumber}
+                onChange={(next) => onChange({ nameOrNumber: next })}
+              />
+            )}
+            {value.specificationMode === "technical" && fields.stitchCount && (
+              <SpecInput
+                label="Stitch count"
+                type="number"
+                required={fields.required.stitchCount}
+                value={value.stitchCount}
+                onChange={(next) => onChange({ stitchCount: next })}
+              />
+            )}
+            {value.specificationMode === "technical" && fields.needle && (
+              <SpecInput
+                label="Needle"
+                type="number"
+                required={fields.required.needle}
+                value={value.needle}
+                onChange={(next) => onChange({ needle: next })}
+              />
+            )}
+            {value.specificationMode === "technical" && fields.area && (
+              <SpecInput
+                label="Area (mm)"
+                type="number"
+                step="0.01"
+                required={fields.required.area}
+                value={value.area}
+                onChange={(next) => onChange({ area: next })}
+              />
+            )}
+            {value.specificationMode === "technical" && fields.height && (
+              <SpecInput
+                label="Height (mm)"
+                type="number"
+                step="0.01"
+                required={fields.required.height}
+                value={value.height}
+                onChange={(next) => onChange({ height: next })}
+              />
+            )}
+            {value.specificationMode === "technical" && fields.width && (
+              <SpecInput
+                label="Width (mm)"
+                type="number"
+                step="0.01"
+                required={fields.required.width}
+                value={value.width}
+                onChange={(next) => onChange({ width: next })}
+              />
+            )}
+            {value.specificationMode === "design_property" && fields.image && (
+              <div className="sm:col-span-3">
+                <div className="flex flex-col gap-4 rounded-xl border border-stone-200 bg-white p-4 sm:flex-row sm:items-center">
+                  {imagePreview && !value.removeImage ? (
+                    <img
+                      src={imagePreview}
+                      alt=""
+                      className="h-24 w-24 rounded-lg border border-stone-200 object-cover"
+                    />
+                  ) : (
+                    <span className="flex h-24 w-24 items-center justify-center rounded-lg bg-stone-100">
+                      <ImageIcon className="h-6 w-6 text-stone-400" />
+                    </span>
+                  )}
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-stone-800">
+                      Design property <RequiredMark />
+                    </p>
+                    <p className="mt-1 text-xs text-stone-500">
+                      {value.imageFile?.name ||
+                        value.existingImage?.name ||
+                        "No image selected"}
+                    </p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <label className="cursor-pointer rounded-lg bg-stone-950 px-3 py-2 text-xs font-semibold text-white">
+                        {value.existingImage || value.imageFile
+                          ? "Replace image"
+                          : "Select image"}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          required={!value.existingImage}
+                          onChange={(event) =>
+                            onChange({
+                              imageFile: event.target.files?.[0] || null,
+                              removeImage: false,
+                            })
+                          }
+                          className="sr-only"
+                        />
+                      </label>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
           </div>
         </div>
       )}

@@ -8,7 +8,7 @@ export interface ApiImage {
 }
 
 export interface ApiDesignTypeDetails {
-  image: Pick<ApiImage, 'name' | 'uri' | 'thumbnailUri'> | null;
+  image: Pick<ApiImage, "name" | "uri" | "thumbnailUri"> | null;
   nameOrNumber: string | null;
   stitchCount: number;
   needle: number;
@@ -22,7 +22,7 @@ export interface ApiDesignType {
   typeName: string | null;
   customTypeName?: string | null;
   isCustom?: boolean;
-  specificationMode: 'design_property' | 'technical';
+  specificationMode: "design_property" | "technical";
   details: ApiDesignTypeDetails;
 }
 
@@ -49,7 +49,6 @@ export interface ApiDesign {
   pricePaise: number;
   sequenceType: string | null;
   measurementUnit: string;
-  designTypeImageCards: boolean;
   designTypes: ApiDesignType[];
   images: ApiImage[];
   files: ApiDesignFile[];
@@ -91,7 +90,7 @@ export interface ApiHomeData {
 
 export interface ApiImageSearchResult extends ApiDesign {
   similarityScore: number;
-  similarityLabel: 'Very close' | 'Similar' | 'Related' | string;
+  similarityLabel: "Very close" | "Similar" | "Related" | string;
 }
 
 export interface ApiImageSearchData {
@@ -114,7 +113,7 @@ export interface ApiFolder {
   id: string;
   name: string;
   pricePaise: number;
-  currency: 'INR' | string;
+  currency: "INR" | string;
   fileCount: number;
   totalSize: number;
   coverImageUri: string | null;
