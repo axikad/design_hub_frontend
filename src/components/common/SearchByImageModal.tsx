@@ -29,7 +29,6 @@ export const SearchByImageModal: React.FC<SearchByImageModalProps> = ({ isOpen, 
   const [filename, setFilename] = useState('');
   const [error, setError] = useState('');
   const [results, setResults] = useState<ApiImageSearchResult[]>([]);
-  const [engine, setEngine] = useState('');
 
   useEffect(() => {
     if (!isOpen) return;
@@ -50,7 +49,6 @@ export const SearchByImageModal: React.FC<SearchByImageModalProps> = ({ isOpen, 
     if (!file || searching) return;
     setError('');
     setResults([]);
-    setEngine('');
 
     if (!acceptedTypes.has(file.type)) {
       setError('Choose a JPG, PNG or WebP image.');
@@ -69,7 +67,6 @@ export const SearchByImageModal: React.FC<SearchByImageModalProps> = ({ isOpen, 
     try {
       const response = await marketplaceApi.searchByImage(file);
       setResults(response.data.results);
-      setEngine(response.data.engine);
     } catch (requestError) {
       setError(getErrorMessage(requestError));
     } finally {
@@ -135,9 +132,8 @@ export const SearchByImageModal: React.FC<SearchByImageModalProps> = ({ isOpen, 
 
             {!searching && preview && !error && (
               <section className="mt-7" aria-live="polite">
-                <div className="flex items-end justify-between gap-3">
+                <div>
                   <div><p className="text-xs font-bold uppercase tracking-[0.16em] text-amber-800">Visual matches</p><h3 className="mt-1 font-serif text-2xl font-semibold text-stone-950">{results.length} related {results.length === 1 ? 'design' : 'designs'}</h3></div>
-                  {engine && <span className="rounded-full bg-stone-100 px-3 py-1 text-[10px] font-medium text-stone-500">Search engine: {engine.replaceAll('_', ' ')}</span>}
                 </div>
 
                 {results.length > 0 ? (

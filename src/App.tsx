@@ -66,7 +66,7 @@ const RouteEffects = () => {
       firstRender.current = false;
       return;
     }
-    window.requestAnimationFrame(() => document.getElementById('main-content')?.focus());
+    window.requestAnimationFrame(() => document.getElementById('main-content')?.focus({ preventScroll: true }));
   }, [pathname]);
   return null;
 };
